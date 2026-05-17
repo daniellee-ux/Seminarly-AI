@@ -13,7 +13,7 @@
 
 ```bash
 git clone https://github.com/daniellee-ux/Seminarly-AI.git
-cd Seminarly
+cd Seminarly-AI
 brew install xcodegen
 xcodegen generate
 ```

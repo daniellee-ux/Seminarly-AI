@@ -14,7 +14,7 @@ The notepad is the key difference. Instead of passively summarising everything, 
 
 ```bash
 git clone https://github.com/daniellee-ux/Seminarly-AI.git
-cd Seminarly
+cd Seminarly-AI
 brew install xcodegen   # if not already installed
 xcodegen generate
 open Seminarly.xcodeproj
