@@ -27,8 +27,7 @@ jobs:
             -project Seminarly.xcodeproj \
             -scheme Seminarly \
             -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY="-" \
-            | xcpretty || true
+            CODE_SIGN_IDENTITY="-"
 
       - name: Run tests
         run: |
@@ -36,5 +35,4 @@ jobs:
             -project Seminarly.xcodeproj \
             -scheme SeminarlyTests \
             -destination 'platform=macOS' \
-            CODE_SIGN_IDENTITY="-" \
-            | xcpretty || true
+            CODE_SIGN_IDENTITY="-"
