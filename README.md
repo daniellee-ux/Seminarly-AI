@@ -217,4 +217,4 @@ Bug reports, feature requests, and pull requests are welcome. See [CONTRIBUTING.
 
 ## License
 
-Apache 2.0. See [LICENSE](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
+GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

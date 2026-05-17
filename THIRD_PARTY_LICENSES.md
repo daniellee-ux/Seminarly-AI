@@ -22,4 +22,4 @@ Pulled in via WhisperKit and ArgumentParser. Versions resolved by SwiftPM.
 
 ## License compatibility
 
-All dependencies are MIT or Apache 2.0, both of which are compatible with the project's Apache 2.0 license (see [LICENSE](LICENSE)).
+All dependencies are MIT or Apache 2.0, both of which are compatible with distributing this project under the GNU Affero General Public License v3.0 (AGPL-3.0). See [LICENSE](LICENSE).

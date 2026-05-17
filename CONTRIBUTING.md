@@ -49,4 +49,4 @@ If you want to propose a larger change, open an issue first to discuss the appro
 
 ## License
 
-By contributing, you agree your contributions will be licensed under the [Apache 2.0 License](LICENSE).
+By contributing, you agree your contributions will be licensed under the [GNU Affero General Public License v3.0](LICENSE).
