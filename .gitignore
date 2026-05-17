@@ -1,0 +1,34 @@
+# Xcode
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# App-specific
+*.app
+
+# Built CLI binary — produced by scripts/build-cli.sh
+/Tools/seminarly-cli
+
+# Claude Code local state — keep `.claude/skills/` checked in, exclude the rest
+.claude/settings.local.json
+.claude/worktrees/

@@ -1,0 +1,91 @@
+name: Seminarly
+options:
+  bundleIdPrefix: ai.seminarly
+  deploymentTarget:
+    macOS: "14.4"
+  xcodeVersion: "16.3"
+  minimumXcodeGenVersion: "2.40"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.4"
+
+packages:
+  WhisperKit:
+    url: https://github.com/argmaxinc/WhisperKit
+    from: "0.18.0"
+  FluidAudio:
+    url: https://github.com/FluidInference/FluidAudio
+    minorVersion: "0.11.0"
+  ArgumentParser:
+    url: https://github.com/apple/swift-argument-parser
+    from: "1.3.0"
+
+targets:
+  Seminarly:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: ai.seminarly.Seminarly
+        INFOPLIST_FILE: Sources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/Seminarly.entitlements
+        PRODUCT_NAME: Seminarly
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: true
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - package: WhisperKit
+      - package: FluidAudio
+    entitlements:
+      path: Sources/Seminarly.entitlements
+      properties:
+        com.apple.security.app-sandbox: false
+        com.apple.security.device.audio-input: true
+
+  seminarly-cli:
+    type: tool
+    platform: macOS
+    sources:
+      - CLI
+      - Sources/CLI
+      - Sources/Storage
+      - Sources/Persistence
+      - path: Sources/NoteStructuring/NoteTemplate.swift
+      - path: Sources/NoteStructuring/MeetingMarkdownRenderer.swift
+      - path: Sources/Diarization/SpeakerEmbedding.swift
+    dependencies:
+      - package: ArgumentParser
+        product: ArgumentParser
+    settings:
+      base:
+        PRODUCT_NAME: seminarly-cli
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: false
+        GENERATE_INFOPLIST_FILE: true
+        SKIP_INSTALL: false
+
+  SeminarlyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - Tests
+    dependencies:
+      - target: Seminarly
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Seminarly.app/Contents/MacOS/Seminarly"
+        SWIFT_STRICT_CONCURRENCY: complete
+        CODE_SIGN_IDENTITY: "-"
+        GENERATE_INFOPLIST_FILE: true

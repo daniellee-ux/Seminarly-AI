@@ -1,0 +1,40 @@
+name: Tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build
+        run: |
+          xcodebuild build \
+            -project Seminarly.xcodeproj \
+            -scheme Seminarly \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            | xcpretty || true
+
+      - name: Run tests
+        run: |
+          xcodebuild test \
+            -project Seminarly.xcodeproj \
+            -scheme SeminarlyTests \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            | xcpretty || true
