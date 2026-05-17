@@ -24,6 +24,7 @@ jobs:
       - name: Build
         run: |
           xcodebuild build \
+            -quiet \
             -project Seminarly.xcodeproj \
             -scheme Seminarly \
             -destination 'platform=macOS' \
@@ -32,6 +33,7 @@ jobs:
       - name: Run tests
         run: |
           xcodebuild test \
+            -quiet \
             -project Seminarly.xcodeproj \
             -scheme SeminarlyTests \
             -destination 'platform=macOS' \
