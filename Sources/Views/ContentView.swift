@@ -348,12 +348,23 @@ struct ContentView: View {
     }
 
     private func deleteMeeting(_ meeting: Meeting) {
-        if selectedMeeting == meeting {
+        let isDeletingSelectedMeeting = selectedMeeting == meeting
+
+        if isDeletingSelectedMeeting {
             selectedMeeting = nil
         }
+
+        if isDeletingSelectedMeeting, showingRecording, !appState.isRecording {
+            showingRecording = false
+            viewingRecording = false
+            preSelectedProcess = nil
+            audioMonitor.reseedAfterRecording()
+        }
+
         meeting.deleteAudioFiles()
         modelContext.delete(meeting)
         try? modelContext.save()
+        meetingToDelete = nil
     }
 }
 
