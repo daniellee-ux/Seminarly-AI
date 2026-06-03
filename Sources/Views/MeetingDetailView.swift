@@ -13,6 +13,8 @@ struct MeetingDetailView: View {
     @State private var rediarizeStatus = ""
     @State private var editableUserNotes: String = ""
     @State private var showRegenerateSheet = false
+    @State private var processingMeeting: Meeting?
+    @State private var errorMeeting: Meeting?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -150,7 +152,7 @@ struct MeetingDetailView: View {
             .font(Typography.caption)
             .foregroundStyle(SeminarlyColors.textSecondary)
 
-            if noteService.isProcessing {
+            if isGeneratingCurrentMeeting {
                 HStack(spacing: Spacing.xs) {
                     ProgressView()
                         .controlSize(.small)
@@ -159,7 +161,7 @@ struct MeetingDetailView: View {
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
             }
-            if let error = noteService.errorMessage {
+            if let error = currentGenerationError {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(SeminarlyColors.destructive)
                     .font(Typography.caption)
@@ -177,7 +179,10 @@ struct MeetingDetailView: View {
             onTranscriptRefTap: { _ in selectedTab = 1 }
         )
         .onAppear {
-            editableUserNotes = meeting.userNotesText ?? ""
+            syncEditableUserNotes(with: meeting)
+        }
+        .onChange(of: meeting) { _, newMeeting in
+            syncEditableUserNotes(with: newMeeting)
         }
         .onChange(of: editableUserNotes) { _, newValue in
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -196,6 +201,20 @@ struct MeetingDetailView: View {
             return "No transcript available"
         }
         return "Add notes and click Enhance, or use Regenerate to create notes from the transcript"
+    }
+
+    private var isGeneratingCurrentMeeting: Bool {
+        guard let processingMeeting else { return false }
+        return noteService.isProcessing && processingMeeting == meeting
+    }
+
+    private var currentGenerationError: String? {
+        guard let errorMeeting, errorMeeting == meeting else { return nil }
+        return noteService.errorMessage
+    }
+
+    private func syncEditableUserNotes(with targetMeeting: Meeting) {
+        editableUserNotes = targetMeeting.userNotesText ?? ""
     }
 
     private var transcriptTab: some View {
@@ -322,28 +341,33 @@ struct MeetingDetailView: View {
     }
 
     private func enhanceUserNotes() {
-        guard let transcript = meeting.transcript else { return }
+        guard !noteService.isProcessing,
+              let transcript = meeting.transcript else { return }
         let notes = editableUserNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !notes.isEmpty else { return }
+        let targetMeeting = meeting
+        let targetTranscript = transcript
 
-        let template = meeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate
+        let template = targetMeeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate
         // Inherit the existing note's language if already generated; otherwise fall
         // back to the user's default. This keeps re-enhance idempotent in language.
-        let language: SummaryLanguage = meeting.structuredNote.flatMap {
+        let language: SummaryLanguage = targetMeeting.structuredNote.flatMap {
             SummaryLanguage.fromStorageCode($0.language)
         } ?? SummaryLanguageSettings.shared.defaultLanguage
 
+        beginNoteGeneration(for: targetMeeting)
         Task {
+            defer { endNoteGeneration(for: targetMeeting) }
             if let result = await noteService.enhanceNotes(
                 userNotes: notes,
-                transcript: transcript.diarizedText,
+                transcript: targetTranscript.diarizedText,
                 template: template,
                 summaryLanguage: language
             ) {
-                meeting.title = result.title
-                meeting.structuredNote = result.note
-                result.note.meeting = meeting
-                meeting.userNotesText = notes
+                targetMeeting.title = result.title
+                targetMeeting.structuredNote = result.note
+                result.note.meeting = targetMeeting
+                targetMeeting.userNotesText = notes
                 try? modelContext.save()
             }
         }
@@ -404,33 +428,57 @@ struct MeetingDetailView: View {
     }
 
     private func regenerateNotes(template: NoteTemplate, language: SummaryLanguage) {
-        guard let transcript = meeting.transcript else { return }
+        guard !noteService.isProcessing,
+              let transcript = meeting.transcript else { return }
         let notes = editableUserNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetMeeting = meeting
+        let targetTranscript = transcript
 
+        beginNoteGeneration(for: targetMeeting)
         Task {
+            defer { endNoteGeneration(for: targetMeeting) }
             let result: (title: String, note: StructuredNote)?
             if notes.isEmpty {
                 result = await noteService.structureTranscript(
-                    transcript.diarizedText,
+                    targetTranscript.diarizedText,
                     template: template,
                     summaryLanguage: language
                 )
             } else {
                 result = await noteService.enhanceNotes(
                     userNotes: notes,
-                    transcript: transcript.diarizedText,
+                    transcript: targetTranscript.diarizedText,
                     template: template,
                     summaryLanguage: language
                 )
             }
             guard let result else { return }
-            meeting.title = result.title
-            meeting.structuredNote = result.note
-            result.note.meeting = meeting
+            targetMeeting.title = result.title
+            targetMeeting.structuredNote = result.note
+            result.note.meeting = targetMeeting
             if !notes.isEmpty {
-                meeting.userNotesText = notes
+                targetMeeting.userNotesText = notes
             }
             try? modelContext.save()
+        }
+    }
+
+    private func beginNoteGeneration(for targetMeeting: Meeting) {
+        processingMeeting = targetMeeting
+        errorMeeting = nil
+    }
+
+    private func endNoteGeneration(for targetMeeting: Meeting) {
+        if let current = processingMeeting, current == targetMeeting {
+            processingMeeting = nil
+        }
+
+        if noteService.errorMessage == nil {
+            if let current = errorMeeting, current == targetMeeting {
+                errorMeeting = nil
+            }
+        } else {
+            errorMeeting = targetMeeting
         }
     }
 
