@@ -91,13 +91,14 @@ final class NoteStructuringService: ObservableObject {
             return nil
         }
 
+        let resolvedSummaryLanguage = SummaryLanguage.resolvedForTranscript(summaryLanguage, transcript: transcript)
         let provider = makeProvider(for: descriptor)
-        let systemPrompt = PromptTemplates.systemPrompt(for: template, summaryLanguage: summaryLanguage)
+        let systemPrompt = PromptTemplates.systemPrompt(for: template, summaryLanguage: resolvedSummaryLanguage)
         let userPrompt = PromptTemplates.structureNotes(
             transcript: transcript,
             template: template,
             customInstructions: customInstructions,
-            summaryLanguage: summaryLanguage
+            summaryLanguage: resolvedSummaryLanguage
         )
 
         do {
@@ -110,7 +111,7 @@ final class NoteStructuringService: ObservableObject {
             return decodeNote(
                 from: responseText,
                 template: template,
-                summaryLanguage: summaryLanguage
+                summaryLanguage: resolvedSummaryLanguage
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -137,14 +138,15 @@ final class NoteStructuringService: ObservableObject {
             return nil
         }
 
+        let resolvedSummaryLanguage = SummaryLanguage.resolvedForTranscript(summaryLanguage, transcript: transcript)
         let provider = makeProvider(for: descriptor)
-        let systemPrompt = PromptTemplates.enhanceSystemPrompt(for: template, summaryLanguage: summaryLanguage)
+        let systemPrompt = PromptTemplates.enhanceSystemPrompt(for: template, summaryLanguage: resolvedSummaryLanguage)
         let userPrompt = PromptTemplates.enhanceWithUserNotes(
             userNotes: userNotes,
             transcript: transcript,
             template: template,
             customInstructions: customInstructions,
-            summaryLanguage: summaryLanguage
+            summaryLanguage: resolvedSummaryLanguage
         )
 
         do {
@@ -157,7 +159,7 @@ final class NoteStructuringService: ObservableObject {
             return decodeNote(
                 from: responseText,
                 template: template,
-                summaryLanguage: summaryLanguage
+                summaryLanguage: resolvedSummaryLanguage
             )
         } catch {
             errorMessage = error.localizedDescription

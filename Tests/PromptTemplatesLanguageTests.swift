@@ -147,4 +147,14 @@ final class PromptTemplatesLanguageTests: XCTestCase {
         XCTAssertTrue(rule!.contains("Korean"))
         XCTAssertTrue(rule!.hasPrefix("- "), "Rule should be formatted as a bullet list item")
     }
+
+    func testResolvedMatchTranscriptInjectsConcreteLanguageDirective() {
+        let transcript = "會議確認產品方向，團隊會用繁體中文整理後續決策。"
+        let resolved = SummaryLanguage.resolvedForTranscript(.matchTranscript, transcript: transcript)
+        let prompt = PromptTemplates.systemPrompt(for: .meeting, summaryLanguage: resolved)
+
+        XCTAssertEqual(resolved, .zhHant)
+        XCTAssertTrue(prompt.contains("OUTPUT LANGUAGE:"))
+        XCTAssertTrue(prompt.contains("Traditional Chinese"))
+    }
 }

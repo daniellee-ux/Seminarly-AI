@@ -41,6 +41,7 @@ struct RecordingView: View {
     @State private var selectedSummaryLanguage: SummaryLanguage = SummaryLanguageSettings.shared.defaultLanguage
     @State private var summaryLanguageCustomDraft: String = SummaryLanguageSettings.shared.lastCustomLanguage
     @State private var showSummaryLanguageCustomEditor: Bool = false
+    @State private var showRegenerateSheet: Bool = false
 
     // Notepad state
     @State private var userNotesText = ""
@@ -62,6 +63,17 @@ struct RecordingView: View {
         }
         .background(SeminarlyColors.background)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showRegenerateSheet) {
+            if let meeting = savedMeeting {
+                RegenerateNotesSheet(
+                    initialTemplate: initialRegenerateTemplate(for: meeting),
+                    initialLanguage: initialRegenerateLanguage(for: meeting),
+                    detectedLanguage: detectedSummaryLanguage(for: meeting)
+                ) { template, language in
+                    applyEnhancementPreferences(template: template, language: language, meeting: meeting)
+                }
+            }
+        }
         .if(isVisible) { view in
             view
                 .navigationTitle("Recording")
@@ -259,6 +271,8 @@ struct RecordingView: View {
                     .foregroundStyle(SeminarlyColors.textTertiary)
             }
 
+            postRecordingSummaryLanguageChip(for: meeting)
+
             Spacer()
 
             if let error = noteService.errorMessage {
@@ -270,7 +284,7 @@ struct RecordingView: View {
 
             if meeting.structuredNote == nil {
                 Button {
-                    runEnhancement()
+                    showRegenerateSheet = true
                 } label: {
                     Label("Enhance with Transcript", systemImage: "sparkles")
                         .font(Typography.captionMedium)
@@ -284,9 +298,7 @@ struct RecordingView: View {
                 .help(enhanceHelpText(for: meeting))
             } else {
                 Button {
-                    meeting.structuredNote = nil
-                    try? modelContext.save()
-                    runEnhancement()
+                    showRegenerateSheet = true
                 } label: {
                     Label("Re-enhance", systemImage: "arrow.clockwise")
                         .font(Typography.captionMedium)
@@ -294,7 +306,7 @@ struct RecordingView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!canEnhance || noteService.isProcessing)
-                .help("Re-run enhancement with current template")
+                .help("Choose template and language, then re-run enhancement")
             }
 
             Button {
@@ -320,7 +332,25 @@ struct RecordingView: View {
     private func enhanceHelpText(for meeting: Meeting) -> String {
         if !noteService.hasAPIKey { return "Add \(noteService.currentProviderDisplayName) API key in Settings" }
         if meeting.transcript?.rawText.isEmpty ?? true { return "No transcript available" }
-        return "Generate structured notes from your notes + transcript"
+        return "Choose template and language, then generate structured notes"
+    }
+
+    private func postRecordingSummaryLanguageChip(for meeting: Meeting) -> some View {
+        let language = initialRegenerateLanguage(for: meeting)
+        let displayLanguage = language == .matchTranscript
+            ? detectedSummaryLanguage(for: meeting) ?? language
+            : language
+
+        return chipLabel(
+            icon: "text.bubble",
+            text: "Notes: \(displayLanguage.displayName)",
+            trailingChevron: false,
+            compact: false,
+            maxTextWidth: 180
+        )
+        .help(language == .matchTranscript
+            ? "Notes language: detected \(displayLanguage.displayName)"
+            : "Notes language: \(displayLanguage.displayName)")
     }
 
     private var recordingToolbar: some View {
@@ -902,7 +932,10 @@ struct RecordingView: View {
 
             // 2. Detect language (acoustic analysis, independent of transcription text)
             if transcriptionEngine.detectedLanguage == nil {
-                let detectSamples = Array(recording.systemSamples.prefix(Int(16000 * 30)))
+                let languageDetectionSource = recording.systemSamples.isEmpty
+                    ? recording.combinedSamples
+                    : recording.systemSamples
+                let detectSamples = Array(languageDetectionSource.prefix(Int(16000 * 30)))
                 await transcriptionEngine.detectLanguage(detectSamples)
             }
 
@@ -978,9 +1011,39 @@ struct RecordingView: View {
         }
     }
 
-    /// Runs note enhancement on the saved meeting. Called when the user clicks
-    /// the "Enhance with Transcript" CTA in `postRecordingView`.
-    private func runEnhancement() {
+    private func initialRegenerateTemplate(for meeting: Meeting) -> NoteTemplate {
+        meeting.structuredNote?.resolvedTemplate ?? selectedTemplate
+    }
+
+    private func initialRegenerateLanguage(for meeting: Meeting) -> SummaryLanguage {
+        if let note = meeting.structuredNote {
+            return SummaryLanguage.fromStorageCode(note.language)
+        }
+        return selectedSummaryLanguage
+    }
+
+    private func detectedSummaryLanguage(for meeting: Meeting) -> SummaryLanguage? {
+        guard let transcript = meeting.transcript else {
+            return SummaryLanguage.fromLanguageCode(meeting.detectedLanguage)
+        }
+        return SummaryLanguage.detectTranscriptLanguage(transcript.diarizedText)
+    }
+
+    private func applyEnhancementPreferences(template: NoteTemplate, language: SummaryLanguage, meeting: Meeting) {
+        selectedTemplate = template
+        selectedSummaryLanguage = language
+        if case .custom(let name) = language {
+            summaryLanguageCustomDraft = name
+        }
+
+        meeting.structuredNote = nil
+        try? modelContext.save()
+        runEnhancement(template: template, summaryLanguage: language)
+    }
+
+    /// Runs note enhancement on the saved meeting using the selected preferences
+    /// from `RegenerateNotesSheet`.
+    private func runEnhancement(template: NoteTemplate, summaryLanguage: SummaryLanguage) {
         guard let meeting = savedMeeting,
               let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
@@ -989,6 +1052,8 @@ struct RecordingView: View {
 
         let currentNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
         meeting.userNotesText = currentNotes.isEmpty ? nil : currentNotes
+        let targetTemplate = template
+        let targetSummaryLanguage = summaryLanguage
 
         Task {
             let result: (title: String, note: StructuredNote)?
@@ -1001,22 +1066,22 @@ struct RecordingView: View {
                 } else {
                     notesForPrompt = currentNotes
                 }
-                logger.info("Enhancement: mode=enhance, userNotes=\(currentNotes.count) chars, template=\(selectedTemplate.rawValue)")
+                logger.info("Enhancement: mode=enhance, userNotes=\(currentNotes.count) chars, template=\(targetTemplate.rawValue)")
                 result = await noteService.enhanceNotes(
                     userNotes: notesForPrompt,
                     transcript: transcript.diarizedText,
-                    template: selectedTemplate,
-                    customInstructions: selectedTemplate == .custom ? customInstructions : nil,
-                    summaryLanguage: selectedSummaryLanguage
+                    template: targetTemplate,
+                    customInstructions: targetTemplate == .custom ? customInstructions : nil,
+                    summaryLanguage: targetSummaryLanguage
                 )
             } else {
                 // No user notes — standard transcript structuring
-                logger.info("Enhancement: mode=transcript-only, template=\(selectedTemplate.rawValue)")
+                logger.info("Enhancement: mode=transcript-only, template=\(targetTemplate.rawValue)")
                 result = await noteService.structureTranscript(
                     transcript.diarizedText,
-                    template: selectedTemplate,
-                    customInstructions: selectedTemplate == .custom ? customInstructions : nil,
-                    summaryLanguage: selectedSummaryLanguage
+                    template: targetTemplate,
+                    customInstructions: targetTemplate == .custom ? customInstructions : nil,
+                    summaryLanguage: targetSummaryLanguage
                 )
             }
 

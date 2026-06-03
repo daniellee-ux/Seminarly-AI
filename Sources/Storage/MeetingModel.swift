@@ -213,8 +213,9 @@ final class StructuredNote {
     var meeting: Meeting?
     var generatedAt: Date
 
-    // Storage code for the summary's target language. nil = matched the
-    // transcript at generation time. See SummaryLanguage.storageCode.
+    // Storage code for the summary's target language. Older notes may have nil
+    // for match-transcript generations. New match-transcript requests resolve to
+    // a concrete SummaryLanguage before generation.
     var language: String?
 
     var sections: [NoteSection] {

@@ -20,6 +20,8 @@ enum CaptureState: Sendable {
 /// (sample-by-sample average up to min(sys, mic) count) instead of
 /// concatenating chunks, which caused garbled live transcription.
 final class AudioBufferAccumulator: @unchecked Sendable {
+    static let micPassThroughFallbackSampleCount = 32_000
+
     private let lock = NSLock()
     private var _samples: [Float] = []
     private var _systemSamples: [Float] = []
@@ -28,6 +30,8 @@ final class AudioBufferAccumulator: @unchecked Sendable {
     private var _systemConverter: AudioFormatConverter?
     private var _micConverter: AudioFormatConverter?
     private var _hasMicInput = false
+    private var _hasSystemSource = false
+    private var _micPassThroughFallback = false
 
     var onAudioSamples: (@Sendable ([Float]) -> Void)?
 
@@ -52,12 +56,15 @@ final class AudioBufferAccumulator: @unchecked Sendable {
         return _hasMicInput ? _micSamples : nil
     }
 
-    /// Call before audio starts flowing to tell the accumulator to expect mic input.
-    /// This ensures system audio waits for mic data before emitting (time-aligned mixing).
-    func setMicExpected(_ expected: Bool) {
+    /// Call before audio starts flowing to tell the accumulator which streams to expect.
+    /// When both streams are expected, system audio waits for mic data before emitting
+    /// time-aligned mixes. Mic-only recordings pass through directly.
+    func setMicExpected(_ expected: Bool, hasSystemSource: Bool = true) {
         lock.lock()
         defer { lock.unlock() }
         _hasMicInput = expected
+        _hasSystemSource = hasSystemSource
+        _micPassThroughFallback = false
     }
 
     func reset() {
@@ -70,6 +77,8 @@ final class AudioBufferAccumulator: @unchecked Sendable {
         _systemConverter = nil
         _micConverter = nil
         _hasMicInput = false
+        _hasSystemSource = false
+        _micPassThroughFallback = false
     }
 
     func handleSystemAudioBuffer(_ buffer: AVAudioPCMBuffer) {
@@ -120,10 +129,32 @@ final class AudioBufferAccumulator: @unchecked Sendable {
         let sysCount = _systemSamples.count
         let micCount = _micSamples.count
         let hasMic = _hasMicInput
+        let hasSystemSource = _hasSystemSource
         let cursor = _emittedSampleCount
 
         let newSamples: [Float]
         if hasMic {
+            let micSamplesWaiting = micCount - cursor
+            let shouldPassThroughMic = !hasSystemSource
+                || _micPassThroughFallback
+                || (sysCount <= cursor && micSamplesWaiting >= Self.micPassThroughFallbackSampleCount)
+
+            if shouldPassThroughMic {
+                // Mic-only or effectively silent system source: emit mic samples directly.
+                // Once the fallback trips, keep this stream consistent for transcription.
+                _micPassThroughFallback = hasSystemSource
+                guard micCount > cursor else {
+                    lock.unlock()
+                    return
+                }
+                newSamples = Array(_micSamples[cursor..<micCount])
+                _emittedSampleCount = micCount
+                _samples.append(contentsOf: newSamples)
+                lock.unlock()
+                onAudioSamples?(newSamples)
+                return
+            }
+
             // Time-aligned mix: only emit up to where both streams have data
             let mixEnd = min(sysCount, micCount)
             guard mixEnd > cursor else {
@@ -204,7 +235,7 @@ final class AudioCaptureManager: ObservableObject {
 
         let process = selectedProcess
         let wantMic = captureMicrophone
-        accumulator.setMicExpected(wantMic)
+        accumulator.setMicExpected(wantMic, hasSystemSource: process != nil)
         let acc = accumulator
         let tap = processTap
         let mic = micCapture
@@ -274,6 +305,7 @@ final class AudioCaptureManager: ObservableObject {
         let tap = processTap
         let mic = micCapture
         let acc = accumulator
+        accumulator.setMicExpected(wantMic, hasSystemSource: process != nil)
 
         // Re-attach callbacks (cleared on stop)
         tap.audioBufferCallback = { buffer in

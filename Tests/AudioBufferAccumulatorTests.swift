@@ -74,6 +74,49 @@ final class AudioBufferAccumulatorTests: XCTestCase {
         XCTAssertEqual(acc.samples[4], expected4, accuracy: 1e-6)
     }
 
+    func testMicOnlyWithoutSystemSourcePassesThroughAndEmits() {
+        let acc = AudioBufferAccumulator()
+        acc.setMicExpected(true, hasSystemSource: false)
+
+        let emitted = ThreadSafeSamples()
+        acc.onAudioSamples = { samples in
+            emitted.append(samples)
+        }
+
+        let micSamples: [Float] = [0.15, 0.25, 0.35, 0.45]
+        pushMicSamples(micSamples, to: acc)
+
+        XCTAssertEqual(acc.samples.count, micSamples.count)
+        XCTAssertEqual(emitted.values.count, micSamples.count)
+        XCTAssertEqual(acc.systemSamples.count, 0)
+        XCTAssertEqual(acc.micSamples?.count, micSamples.count)
+
+        for (index, expected) in micSamples.enumerated() {
+            XCTAssertEqual(acc.samples[index], expected, accuracy: 1e-4)
+            XCTAssertEqual(emitted.values[index], expected, accuracy: 1e-4)
+        }
+    }
+
+    func testMicFallsBackToPassThroughWhenSystemSourceStaysSilent() {
+        let acc = AudioBufferAccumulator()
+        acc.setMicExpected(true, hasSystemSource: true)
+
+        let micSamples = Array(repeating: Float(0.25), count: AudioBufferAccumulator.micPassThroughFallbackSampleCount)
+        pushMicSamples(micSamples, to: acc)
+
+        XCTAssertEqual(acc.samples.count, micSamples.count)
+        XCTAssertEqual(acc.systemSamples.count, 0)
+        XCTAssertEqual(acc.micSamples?.count, micSamples.count)
+        XCTAssertEqual(acc.samples.first ?? 0, Float(0.25), accuracy: 1e-4)
+
+        let laterMicSamples: [Float] = [0.4, 0.5, 0.6]
+        pushMicSamples(laterMicSamples, to: acc)
+        XCTAssertEqual(acc.samples.count, micSamples.count + laterMicSamples.count)
+        for (index, expected) in laterMicSamples.enumerated() {
+            XCTAssertEqual(acc.samples[micSamples.count + index], expected, accuracy: 1e-4)
+        }
+    }
+
     func testResetClearsEverything() {
         let acc = AudioBufferAccumulator()
         acc.setMicExpected(true)
@@ -112,5 +155,22 @@ final class AudioBufferAccumulatorTests: XCTestCase {
             channelData[i] = s
         }
         acc.handleMicrophoneBuffer(buffer)
+    }
+
+    private final class ThreadSafeSamples: @unchecked Sendable {
+        private let lock = NSLock()
+        private var storage: [Float] = []
+
+        var values: [Float] {
+            lock.lock()
+            defer { lock.unlock() }
+            return storage
+        }
+
+        func append(_ samples: [Float]) {
+            lock.lock()
+            storage.append(contentsOf: samples)
+            lock.unlock()
+        }
     }
 }
