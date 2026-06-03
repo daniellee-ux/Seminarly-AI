@@ -85,8 +85,9 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     func finalizeTranscription() async -> [TranscriptSegment] {
-        transcriptionTask?.cancel()
+        let inFlightTranscription = transcriptionTask
         transcriptionTask = nil
+        await inFlightTranscription?.value
 
         if !accumulatedAudio.isEmpty {
             let remaining = accumulatedAudio
