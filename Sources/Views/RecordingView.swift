@@ -271,8 +271,6 @@ struct RecordingView: View {
                     .foregroundStyle(SeminarlyColors.textTertiary)
             }
 
-            postRecordingSummaryLanguageChip(for: meeting)
-
             Spacer()
 
             if let error = noteService.errorMessage {
@@ -333,24 +331,6 @@ struct RecordingView: View {
         if !noteService.hasAPIKey { return "Add \(noteService.currentProviderDisplayName) API key in Settings" }
         if meeting.transcript?.rawText.isEmpty ?? true { return "No transcript available" }
         return "Choose template and language, then generate structured notes"
-    }
-
-    private func postRecordingSummaryLanguageChip(for meeting: Meeting) -> some View {
-        let language = initialRegenerateLanguage(for: meeting)
-        let displayLanguage = language == .matchTranscript
-            ? detectedSummaryLanguage(for: meeting) ?? language
-            : language
-
-        return chipLabel(
-            icon: "text.bubble",
-            text: "Notes: \(displayLanguage.displayName)",
-            trailingChevron: false,
-            compact: false,
-            maxTextWidth: 180
-        )
-        .help(language == .matchTranscript
-            ? "Notes language: detected \(displayLanguage.displayName)"
-            : "Notes language: \(displayLanguage.displayName)")
     }
 
     private var recordingToolbar: some View {
