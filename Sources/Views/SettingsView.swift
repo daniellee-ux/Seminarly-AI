@@ -247,7 +247,7 @@ struct SettingsView: View {
                             }
                     }
 
-                    Text("Language for AI-generated summary notes. Independent of the transcription language. Match Transcript lets the model mirror the spoken language.")
+                    Text("Language for AI-generated summary notes. Independent of the transcription language. Match Transcript detects the transcript language before generation.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

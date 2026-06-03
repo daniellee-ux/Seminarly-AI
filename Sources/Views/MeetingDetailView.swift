@@ -42,7 +42,8 @@ struct MeetingDetailView: View {
         .sheet(isPresented: $showRegenerateSheet) {
             RegenerateNotesSheet(
                 initialTemplate: meeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate,
-                initialLanguage: SummaryLanguage.fromStorageCode(meeting.structuredNote?.language)
+                initialLanguage: SummaryLanguage.fromStorageCode(meeting.structuredNote?.language),
+                detectedLanguage: detectedSummaryLanguage
             ) { template, language in
                 regenerateNotes(template: template, language: language)
             }
@@ -395,6 +396,13 @@ struct MeetingDetailView: View {
         }
     }
 
+    private var detectedSummaryLanguage: SummaryLanguage? {
+        guard let transcript = meeting.transcript else {
+            return SummaryLanguage.fromLanguageCode(meeting.detectedLanguage)
+        }
+        return SummaryLanguage.detectTranscriptLanguage(transcript.diarizedText)
+    }
+
     private func regenerateNotes(template: NoteTemplate, language: SummaryLanguage) {
         guard let transcript = meeting.transcript else { return }
         let notes = editableUserNotes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -448,6 +456,7 @@ struct MeetingDetailView: View {
 struct RegenerateNotesSheet: View {
     let initialTemplate: NoteTemplate
     let initialLanguage: SummaryLanguage
+    let detectedLanguage: SummaryLanguage?
     let onApply: (NoteTemplate, SummaryLanguage) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -458,10 +467,12 @@ struct RegenerateNotesSheet: View {
     init(
         initialTemplate: NoteTemplate,
         initialLanguage: SummaryLanguage,
+        detectedLanguage: SummaryLanguage? = nil,
         onApply: @escaping (NoteTemplate, SummaryLanguage) -> Void
     ) {
         self.initialTemplate = initialTemplate
         self.initialLanguage = initialLanguage
+        self.detectedLanguage = detectedLanguage
         self.onApply = onApply
         _template = State(initialValue: initialTemplate)
 
@@ -522,6 +533,12 @@ struct RegenerateNotesSheet: View {
                     Text("Custom…").tag(SummaryLanguage.custom(""))
                 }
                 .pickerStyle(.menu)
+
+                if languageSelection == .matchTranscript, let detectedLanguage {
+                    Text("Detected: \(detectedLanguage.displayName)")
+                        .font(Typography.caption)
+                        .foregroundStyle(SeminarlyColors.textSecondary)
+                }
 
                 if isCustomSelected {
                     TextField("e.g., Korean, Klingon, Latin", text: $customDraft)

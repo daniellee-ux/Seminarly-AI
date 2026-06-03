@@ -96,4 +96,47 @@ final class SummaryLanguageTests: XCTestCase {
         XCTAssertTrue(SummaryLanguage.presets.contains(.es))
         XCTAssertFalse(SummaryLanguage.presets.contains(.matchTranscript))
     }
+
+    // MARK: - Match transcript resolution
+
+    func testResolvedForTranscriptKeepsExplicitLanguage() {
+        let transcript = "This meeting was conducted in English."
+        XCTAssertEqual(SummaryLanguage.resolvedForTranscript(.ko, transcript: transcript), .ko)
+    }
+
+    func testDetectTranscriptLanguageEnglish() {
+        let transcript = "Alice reviewed the launch plan and Bob confirmed the timeline."
+        XCTAssertEqual(SummaryLanguage.detectTranscriptLanguage(transcript), .en)
+    }
+
+    func testDetectTranscriptLanguageTraditionalChinese() {
+        let transcript = "會議討論產品策略，市場回饋顯示繁體中文內容需要更準確。後續團隊會整理優先順序。"
+        XCTAssertEqual(SummaryLanguage.detectTranscriptLanguage(transcript), .zhHant)
+    }
+
+    func testDetectTranscriptLanguageSimplifiedChinese() {
+        let transcript = "会议讨论产品策略，市场反馈显示简体中文内容需要更准确。后续团队会整理优先顺序。"
+        XCTAssertEqual(SummaryLanguage.detectTranscriptLanguage(transcript), .zh)
+    }
+
+    func testDetectTranscriptLanguageMixedEnglishAndTraditionalChinese() {
+        let transcript = """
+        The host opened with a short product intro before switching into commentary.
+        這次更新會改善錄音摘要，重點是讓繁體中文輸出更穩定，也會保留使用者提到的關鍵決策。
+        After that, the speaker compared the beta feedback and rollout timing.
+        """
+        XCTAssertEqual(SummaryLanguage.detectTranscriptLanguage(transcript), .zhHant)
+    }
+
+    func testLanguageCodeZHUsesTranscriptScriptWhenAvailable() {
+        let transcript = "團隊會優先處理繁體中文摘要的準確度。"
+        XCTAssertEqual(SummaryLanguage.fromLanguageCode("zh", sample: transcript), .zhHant)
+    }
+
+    func testResolvedMatchTranscriptReturnsConcreteLanguage() {
+        let transcript = "会议确认下周发布，团队会继续跟进用户反馈。"
+        let resolved = SummaryLanguage.resolvedForTranscript(.matchTranscript, transcript: transcript)
+        XCTAssertEqual(resolved, .zh)
+        XCTAssertNotEqual(resolved, .matchTranscript)
+    }
 }
