@@ -32,3 +32,7 @@ DerivedData/
 # Claude Code local state — keep `.claude/skills/` checked in, exclude the rest
 .claude/settings.local.json
 .claude/worktrees/
+
+# Local release build artifacts
+build/
+.dmgvenv/
