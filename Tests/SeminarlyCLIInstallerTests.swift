@@ -292,6 +292,19 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.localBinOnPath)
     }
 
+    func testAddLocalBinToPathWritesShellAppropriateFileForBashUser() throws {
+        // A bash user's PATH line must land in a file bash sources (.bash_profile),
+        // not ~/.zshrc — otherwise the write-then-read would never agree.
+        let installer = makeInstaller(environment: ["SHELL": "/bin/bash", "PATH": "/usr/bin:/bin"])
+        try installer.addLocalBinToPath()
+
+        let bashProfile = home.appendingPathComponent(".bash_profile")
+        XCTAssertTrue(fm.fileExists(atPath: bashProfile.path))
+        XCTAssertTrue(try String(contentsOf: bashProfile, encoding: .utf8).contains(SeminarlyCLIInstaller.pathExportLine))
+        XCTAssertFalse(fm.fileExists(atPath: home.appendingPathComponent(".zshrc").path))
+        XCTAssertTrue(installer.localBinOnPath) // read agrees with the write
+    }
+
     func testAddLocalBinToPathAppendsWhenOnlyCommentPresent() throws {
         let zshrc = home.appendingPathComponent(".zshrc")
         try "# a note mentioning .local/bin but not active\n".write(to: zshrc, atomically: true, encoding: .utf8)

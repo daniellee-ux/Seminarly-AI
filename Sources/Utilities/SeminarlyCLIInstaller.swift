@@ -144,6 +144,12 @@ struct SeminarlyCLIInstaller {
         return false
     }
 
+    /// The user's login shell name (e.g. "zsh", "bash"), from `$SHELL`. Empty if
+    /// unset; treated as zsh (the macOS default) everywhere it's consulted.
+    private var loginShellName: String {
+        environment["SHELL"].map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+    }
+
     /// Startup files the user's *actual* login shell reads. Scanning a bash user's
     /// `~/.bash_profile` for a zsh user (or vice-versa) would wrongly conclude PATH
     /// is set, since the active shell never sources it. Unknown/unset shells default
@@ -151,12 +157,18 @@ struct SeminarlyCLIInstaller {
     /// non-zsh user with stray zsh config (and the worst case is a harmless extra
     /// "Add to PATH" prompt, never a hidden one).
     private var shellStartupFileNames: [String] {
-        let shell = environment["SHELL"].map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
-        switch shell {
-        case "bash": return [".bash_profile", ".bashrc", ".profile"]
-        default:     return [".zshrc", ".zprofile", ".zshenv"]
-        }
+        loginShellName == "bash" ? [".bash_profile", ".bashrc", ".profile"] : [".zshrc", ".zprofile", ".zshenv"]
     }
+
+    /// The startup file `addLocalBinToPath()` writes to — chosen so it's one of the
+    /// files `localBinOnPath` scans, keeping the write and the read consistent (a
+    /// bash user's PATH line must land somewhere bash actually sources).
+    var pathFileToEdit: URL {
+        home.appending(path: loginShellName == "bash" ? ".bash_profile" : ".zshrc")
+    }
+
+    /// Tilde-path of ``pathFileToEdit`` for UI copy (e.g. "~/.zshrc").
+    var pathFileDisplayName: String { "~/\(pathFileToEdit.lastPathComponent)" }
 
     /// True if any *active* (non-comment) line actually puts `.local/bin` on `PATH`.
     /// Requires both `.local/bin` and `PATH` on the same line, so neither a `#`
@@ -219,24 +231,25 @@ struct SeminarlyCLIInstaller {
     /// The one consent-sensitive bit, kept isolated from ``install()``: append the
     /// PATH line to ~/.zshrc. Idempotent; safe to call when the file is missing.
     func addLocalBinToPath() throws {
-        let zshrc = home.appending(path: ".zshrc")
-        let existing = (try? String(contentsOf: zshrc, encoding: .utf8)) ?? ""
+        let target = pathFileToEdit
+        let existing = (try? String(contentsOf: target, encoding: .utf8)) ?? ""
         guard !Self.hasActiveLocalBinLine(in: existing) else { return }
         let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
         let block = Data("\(separator)\n# Added by Seminarly — exposes seminarly-cli on your PATH\n\(Self.pathExportLine)\n".utf8)
 
-        // Append in place. If ~/.zshrc is a symlink (dotfile managers do this), open
+        // Append in place. If the file is a symlink (dotfile managers do this), open
         // and append to its *target* rather than atomically replacing the symlink
         // with a regular file, which would silently break the user's dotfile setup.
-        if fileManager.fileExists(atPath: zshrc.path) {
-            let handle = try FileHandle(forWritingTo: zshrc)
+        if fileManager.fileExists(atPath: target.path) {
+            let handle = try FileHandle(forWritingTo: target)
             defer { try? handle.close() }
             try handle.seekToEnd()
             try handle.write(contentsOf: block)
         } else {
-            try block.write(to: zshrc)
+            try createParentDirectory(for: target)
+            try block.write(to: target)
         }
-        logger.notice("Appended ~/.local/bin to PATH in ~/.zshrc")
+        logger.notice("Appended ~/.local/bin to PATH in \(target.lastPathComponent, privacy: .public)")
     }
 
     // MARK: - Helpers

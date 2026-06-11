@@ -25,6 +25,7 @@ struct SettingsView: View {
     @State private var cliInstalled = false
     @State private var cliOnPath = true
     @State private var cliTouchedPaths: [String] = []
+    @State private var cliPathFile = "~/.zshrc"
     @State private var cliStatus: String?
     @State private var cliError: String?
 
@@ -384,7 +385,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
 
-                    Text("appends one line to ~/.zshrc")
+                    Text("appends one line to \(cliPathFile)")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textTertiary)
                 }
@@ -413,6 +414,7 @@ struct SettingsView: View {
         cliInstalled = installer.isInstalled
         cliOnPath = installer.localBinOnPath
         cliTouchedPaths = installer.touchedPaths
+        cliPathFile = installer.pathFileDisplayName
     }
 
     private func installCLI() {
@@ -440,7 +442,7 @@ struct SettingsView: View {
         do {
             try SeminarlyCLIInstaller.bundled.addLocalBinToPath()
             cliError = nil
-            cliStatus = "Added to PATH — restart your shell or run: source ~/.zshrc"
+            cliStatus = "Added to PATH — restart your shell or run: source \(cliPathFile)"
         } catch {
             cliStatus = nil
             cliError = error.localizedDescription
