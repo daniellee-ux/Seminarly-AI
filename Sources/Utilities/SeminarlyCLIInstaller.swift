@@ -159,29 +159,29 @@ struct SeminarlyCLIInstaller {
         // Don't symlink into a DMG / translocated copy — those paths vanish.
         guard isBundleLocationStable else { throw InstallError.bundleLocationUnstable }
 
-        // Preflight so install is atomic: if any target is a real (non-symlink)
-        // file/dir we'd refuse to clobber, fail *before* creating anything rather
-        // than leaving a half-installed state. Stale/own symlinks are replaceable.
-        var targets = [binLink, canonicalSkillDir]
+        // The links we create: binary, canonical skill, and (only if ~/.claude
+        // exists) the Claude Code compat link pointing at the canonical one.
+        var links = [(link: binLink, destination: binary),
+                     (link: canonicalSkillDir, destination: skillDir)]
         if fileManager.fileExists(atPath: home.appending(path: ".claude").path) {
-            targets.append(claudeSkillDir)
+            links.append((link: claudeSkillDir, destination: canonicalSkillDir))
         }
-        if let occupied = targets.first(where: isOccupiedByRealFile) {
+
+        // Preflight so install is atomic — do everything that can fail *before*
+        // creating any symlink: (1) refuse to clobber a real file/dir at a target,
+        // and (2) create every parent directory up front, so e.g. a regular file at
+        // ~/.agents can't leave the binary linked but the skill not. Stale/own
+        // symlinks are replaceable, so they don't count as occupied.
+        if let occupied = links.first(where: { isOccupiedByRealFile($0.link) })?.link {
             throw InstallError.pathOccupied(occupied)
         }
+        for (link, _) in links {
+            try createParentDirectory(for: link)
+        }
 
-        // 1. Binary symlink → ~/.local/bin/seminarly-cli
-        try createParentDirectory(for: binLink)
-        try replaceSymlink(at: binLink, withDestination: binary)
-
-        // 2. Canonical skill dir → bundled skill folder (open standard).
-        try createParentDirectory(for: canonicalSkillDir)
-        try replaceSymlink(at: canonicalSkillDir, withDestination: skillDir)
-
-        // 3. Claude Code compat dir → canonical, but only if ~/.claude exists.
-        if fileManager.fileExists(atPath: home.appending(path: ".claude").path) {
-            try createParentDirectory(for: claudeSkillDir)
-            try replaceSymlink(at: claudeSkillDir, withDestination: canonicalSkillDir)
+        // Parents exist and targets are free — now create the symlinks.
+        for (link, destination) in links {
+            try replaceSymlink(at: link, withDestination: destination)
         }
         logger.notice("Installed seminarly-cli + skill (binary → \(binary.path, privacy: .public))")
     }

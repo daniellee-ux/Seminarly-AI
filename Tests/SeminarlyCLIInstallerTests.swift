@@ -130,6 +130,17 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.isInstalled)
     }
 
+    func testInstallIsAtomicWhenSkillParentIsRegularFile() throws {
+        let installer = makeInstaller()
+        // ~/.agents is a regular file, so creating ~/.agents/skills can't succeed —
+        // and that failure must happen before any symlink is created.
+        XCTAssertTrue(fm.createFile(atPath: home.appendingPathComponent(".agents").path, contents: Data()))
+
+        XCTAssertThrowsError(try installer.install())
+        XCTAssertNil(symlinkTarget(installer.binLink))
+        XCTAssertFalse(installer.isInstalled)
+    }
+
     func testInstallThrowsWhenBundledBinaryMissing() {
         let installer = makeInstaller(binary: .some(nil))
         XCTAssertThrowsError(try installer.install()) { error in
