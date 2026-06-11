@@ -89,16 +89,19 @@ struct SeminarlyCLIInstaller {
     /// installed", so the UI re-offers Install instead of hiding it — the CLI without
     /// its skill leaves the advertised agent access broken.
     var isInstalled: Bool {
-        symlinkResolvesIntoBundle(binLink, suffix: "Contents/Helpers/seminarly-cli")
-            && symlinkResolvesIntoBundle(canonicalSkillDir, suffix: "Contents/Resources/seminarly-cli")
+        guard let binary = bundledBinary, let skillDir = bundledSkillDir else { return false }
+        return symlink(binLink, resolvesTo: binary)
+            && symlink(canonicalSkillDir, resolvesTo: skillDir)
     }
 
-    /// True if `link` is a symlink whose target exists and ends with `suffix` — i.e.
-    /// it resolves into the app bundle. Dangling or non-bundle links report false.
-    private func symlinkResolvesIntoBundle(_ link: URL, suffix: String) -> Bool {
+    /// True if `link` is a symlink whose target exists and is the *same file* as
+    /// `target` — i.e. it points at this running app's bundle, not merely any path
+    /// with the right suffix. A leftover link to an older `Seminarly.app` copy must
+    /// not count as installed, or we'd hide repair and run a stale CLI/schema.
+    private func symlink(_ link: URL, resolvesTo target: URL) -> Bool {
         guard (try? fileManager.destinationOfSymbolicLink(atPath: link.path)) != nil else { return false }
-        let resolved = link.resolvingSymlinksInPath().path
-        return resolved.hasSuffix(suffix) && fileManager.fileExists(atPath: resolved)
+        return fileManager.fileExists(atPath: target.path)
+            && link.resolvingSymlinksInPath().path == target.resolvingSymlinksInPath().path
     }
 
     /// Whether the app is running from a durable location. Launched from a mounted
@@ -203,8 +206,19 @@ struct SeminarlyCLIInstaller {
         let existing = (try? String(contentsOf: zshrc, encoding: .utf8)) ?? ""
         guard !Self.hasActiveLocalBinLine(in: existing) else { return }
         let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
-        let block = "\(separator)\n# Added by Seminarly — exposes seminarly-cli on your PATH\n\(Self.pathExportLine)\n"
-        try (existing + block).write(to: zshrc, atomically: true, encoding: .utf8)
+        let block = Data("\(separator)\n# Added by Seminarly — exposes seminarly-cli on your PATH\n\(Self.pathExportLine)\n".utf8)
+
+        // Append in place. If ~/.zshrc is a symlink (dotfile managers do this), open
+        // and append to its *target* rather than atomically replacing the symlink
+        // with a regular file, which would silently break the user's dotfile setup.
+        if fileManager.fileExists(atPath: zshrc.path) {
+            let handle = try FileHandle(forWritingTo: zshrc)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: block)
+        } else {
+            try block.write(to: zshrc)
+        }
         logger.notice("Appended ~/.local/bin to PATH in ~/.zshrc")
     }
 

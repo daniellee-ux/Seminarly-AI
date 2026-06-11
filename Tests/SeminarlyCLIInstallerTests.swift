@@ -202,6 +202,21 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.isInstalled)
     }
 
+    func testIsInstalledFalseWhenLinkPointsAtDifferentBundle() throws {
+        // A leftover link from another Seminarly.app copy must not read as installed
+        // for *this* app — otherwise repair is hidden and a stale CLI keeps running.
+        let otherHelpers = tempDir.appendingPathComponent("Other/Seminarly.app/Contents/Helpers", isDirectory: true)
+        try fm.createDirectory(at: otherHelpers, withIntermediateDirectories: true)
+        let otherBinary = otherHelpers.appendingPathComponent("seminarly-cli")
+        XCTAssertTrue(fm.createFile(atPath: otherBinary.path, contents: Data()))
+
+        let installer = makeInstaller()
+        try fm.createDirectory(at: installer.binLink.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try fm.createSymbolicLink(at: installer.binLink, withDestinationURL: otherBinary)
+        // The link has the right suffix but points at a different bundle.
+        XCTAssertFalse(installer.isInstalled)
+    }
+
     func testIsInstalledFalseWhenSkillLinkMissing() throws {
         let installer = makeInstaller()
         try installer.install()
@@ -277,6 +292,26 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertEqual(occurrences, 1)
         // Once written, the shell-config heuristic should report it as on PATH.
         XCTAssertTrue(installer.localBinOnPath)
+    }
+
+    func testAddLocalBinToPathPreservesSymlinkedZshrc() throws {
+        // Dotfile managers symlink ~/.zshrc to a tracked file; appending must follow
+        // the symlink, not replace it with a regular file.
+        let dotfiles = home.appendingPathComponent("dotfiles")
+        try fm.createDirectory(at: dotfiles, withIntermediateDirectories: true)
+        let realZshrc = dotfiles.appendingPathComponent("zshrc")
+        try "# managed zshrc\n".write(to: realZshrc, atomically: true, encoding: .utf8)
+        let zshrc = home.appendingPathComponent(".zshrc")
+        try fm.createSymbolicLink(at: zshrc, withDestinationURL: realZshrc)
+
+        let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
+        try installer.addLocalBinToPath()
+
+        // The symlink is preserved...
+        XCTAssertNotNil(try? fm.destinationOfSymbolicLink(atPath: zshrc.path))
+        // ...and the PATH line landed in the symlink target.
+        let target = try String(contentsOf: realZshrc, encoding: .utf8)
+        XCTAssertTrue(target.contains(SeminarlyCLIInstaller.pathExportLine))
     }
 
     // MARK: - touchedPaths
