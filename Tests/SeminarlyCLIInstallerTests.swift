@@ -372,6 +372,16 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertTrue(installer.localBinOnPath)
     }
 
+    func testLocalBinOnPathBashIgnoresProfileFileBashSkips() throws {
+        // bash reads .bash_profile (first existing) and skips .profile; a PATH line
+        // only in .profile must not count for a bash user with a .bash_profile.
+        try "# empty\n".write(to: home.appendingPathComponent(".bash_profile"), atomically: true, encoding: .utf8)
+        try "export PATH=\"$HOME/.local/bin:$PATH\"\n".write(
+            to: home.appendingPathComponent(".profile"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/bin/bash", "PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
     func testCanAddToPathAutomaticallyByShell() {
         XCTAssertTrue(makeInstaller(environment: ["SHELL": "/bin/zsh"]).canAddToPathAutomatically)
         XCTAssertTrue(makeInstaller(environment: ["SHELL": "/bin/bash"]).canAddToPathAutomatically)

@@ -166,7 +166,11 @@ struct SeminarlyCLIInstaller {
     /// falls back to the inherited environment only and never claims false success.
     private var shellStartupFileNames: [String] {
         switch loginShellName {
-        case "bash":    return [".bash_profile", ".bash_login", ".bashrc", ".profile"]
+        // A bash login shell sources only the first of .bash_profile/.bash_login/
+        // .profile that exists (and not .bashrc). Scan exactly the file we'd also
+        // write to, so a PATH line in a file bash skips can't claim false success,
+        // and read/write stay consistent.
+        case "bash":    return [pathFileToEdit.lastPathComponent]
         case "", "zsh": return [".zshrc", ".zprofile", ".zshenv"]
         default:        return []
         }
