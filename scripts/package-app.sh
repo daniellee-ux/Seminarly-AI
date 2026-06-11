@@ -14,7 +14,7 @@
 #        env vars, or auto-discovered from the `asc` CLI store (~/.asc, active account);
 #      OR a notarytool keychain profile (default: seminarly-notary):
 #        xcrun notarytool store-credentials seminarly-notary \
-#          --apple-id "<your-apple-id-email>" --team-id ZPW87426K2
+#          --apple-id "<your-apple-id-email>" --team-id <your-team-id>
 #      Note: keychain-profile notarization can fail from non-interactive shells (the
 #      credential's keychain is session-bound); the API key avoids that entirely.
 #
@@ -27,9 +27,12 @@ SCHEME="Seminarly"
 PROJECT="Seminarly.xcodeproj"
 CONFIG="Release"
 APP_NAME="Seminarly"
-TEAM_ID="ZPW87426K2"
 SIGN_ID="Developer ID Application"
 NOTARY_PROFILE="${NOTARY_PROFILE:-seminarly-notary}"
+
+# Team ID: $DEVELOPMENT_TEAM if set, else auto-detected from your Developer ID cert
+# (nothing hardcoded — bring your own signing identity).
+TEAM_ID="${DEVELOPMENT_TEAM:-$(security find-identity -v -p codesigning | grep -m1 "$SIGN_ID" | grep -oE '\([A-Z0-9]{10}\)' | tail -1 | tr -d '()')}"
 
 # --- notary auth: App Store Connect API key (headless), else keychain profile ----
 # Honour explicit env vars first; otherwise auto-discover from the `asc` CLI store.
