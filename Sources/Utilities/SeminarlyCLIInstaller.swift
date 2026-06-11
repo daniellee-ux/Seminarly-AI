@@ -144,14 +144,16 @@ struct SeminarlyCLIInstaller {
         return false
     }
 
-    /// True if any *active* (non-comment) line references `.local/bin`. A mention
-    /// only inside a `#` comment doesn't count — otherwise we'd wrongly conclude the
-    /// dir is already on PATH and hide the opt-in (and `addLocalBinToPath()` would
-    /// no-op) even though a new shell still wouldn't resolve `seminarly-cli`.
+    /// True if any *active* (non-comment) line actually puts `.local/bin` on `PATH`.
+    /// Requires both `.local/bin` and `PATH` on the same line, so neither a `#`
+    /// comment nor an unrelated mention (e.g. `mkdir -p "$HOME/.local/bin"`) counts —
+    /// otherwise we'd wrongly conclude it's on PATH, hide the opt-in, and leave the
+    /// CLI installed but unresolvable by name in a new shell.
     static func hasActiveLocalBinLine(in contents: String) -> Bool {
         contents.split(whereSeparator: \.isNewline).contains { rawLine in
             let line = rawLine.trimmingCharacters(in: .whitespaces)
-            return !line.hasPrefix("#") && line.contains(".local/bin")
+            guard !line.hasPrefix("#") else { return false }
+            return line.contains(".local/bin") && line.contains("PATH")
         }
     }
 

@@ -283,6 +283,15 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.localBinOnPath)
     }
 
+    func testLocalBinOnPathIgnoresNonPathMention() throws {
+        // An active line that mentions the dir but doesn't touch PATH (e.g. mkdir)
+        // must not count as on-PATH.
+        try "mkdir -p \"$HOME/.local/bin\"\n".write(
+            to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
     func testAddLocalBinToPathAppendsWhenOnlyCommentPresent() throws {
         let zshrc = home.appendingPathComponent(".zshrc")
         try "# a note mentioning .local/bin but not active\n".write(to: zshrc, atomically: true, encoding: .utf8)
