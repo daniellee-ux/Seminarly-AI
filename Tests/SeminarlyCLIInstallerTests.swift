@@ -283,6 +283,28 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.localBinOnPath)
     }
 
+    func testLocalBinOnPathIgnoresPathLikeVariable() throws {
+        // A different variable that merely contains "PATH" must not count.
+        try "export LOCAL_BIN_PATH=\"$HOME/.local/bin\"\n".write(
+            to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/bin/zsh", "PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
+    func testAddToPathAppendsToExistingBashLoginNotNewBashProfile() throws {
+        // bash sources only the first of .bash_profile/.bash_login/.profile; with an
+        // existing ~/.bash_login we must append there, not shadow it with a new file.
+        let bashLogin = home.appendingPathComponent(".bash_login")
+        try "# my bash_login\n".write(to: bashLogin, atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/bin/bash", "PATH": "/usr/bin:/bin"])
+
+        XCTAssertEqual(installer.pathFileToEdit.lastPathComponent, ".bash_login")
+        try installer.addLocalBinToPath()
+        XCTAssertTrue(try String(contentsOf: bashLogin, encoding: .utf8).contains(SeminarlyCLIInstaller.pathExportLine))
+        XCTAssertFalse(fm.fileExists(atPath: home.appendingPathComponent(".bash_profile").path))
+        XCTAssertTrue(installer.localBinOnPath)
+    }
+
     func testLocalBinOnPathIgnoresNonPathMention() throws {
         // An active line that mentions the dir but doesn't touch PATH (e.g. mkdir)
         // must not count as on-PATH.

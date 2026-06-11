@@ -166,7 +166,7 @@ struct SeminarlyCLIInstaller {
     /// falls back to the inherited environment only and never claims false success.
     private var shellStartupFileNames: [String] {
         switch loginShellName {
-        case "bash":    return [".bash_profile", ".bashrc", ".profile"]
+        case "bash":    return [".bash_profile", ".bash_login", ".bashrc", ".profile"]
         case "", "zsh": return [".zshrc", ".zprofile", ".zshenv"]
         default:        return []
         }
@@ -176,7 +176,16 @@ struct SeminarlyCLIInstaller {
     /// files `localBinOnPath` scans, keeping the write and the read consistent (a
     /// bash user's PATH line must land somewhere bash actually sources).
     var pathFileToEdit: URL {
-        home.appending(path: loginShellName == "bash" ? ".bash_profile" : ".zshrc")
+        if loginShellName == "bash" {
+            // A bash login shell sources only the FIRST of these that exists. Append
+            // to the existing one so creating ~/.bash_profile doesn't shadow (and
+            // silently disable) a user's existing ~/.bash_login. Default to
+            // ~/.bash_profile when none exist — the conventional file to create.
+            let candidates = [".bash_profile", ".bash_login", ".profile"]
+            let existing = candidates.first { fileManager.fileExists(atPath: home.appending(path: $0).path) }
+            return home.appending(path: existing ?? ".bash_profile")
+        }
+        return home.appending(path: ".zshrc")
     }
 
     /// Tilde-path of ``pathFileToEdit`` for UI copy (e.g. "~/.zshrc").
@@ -201,8 +210,12 @@ struct SeminarlyCLIInstaller {
     static func hasActiveLocalBinLine(in contents: String) -> Bool {
         contents.split(whereSeparator: \.isNewline).contains { rawLine in
             let line = rawLine.trimmingCharacters(in: .whitespaces)
-            guard !line.hasPrefix("#") else { return false }
-            return line.contains(".local/bin") && line.contains("PATH")
+            guard !line.hasPrefix("#"), line.contains(".local/bin") else { return false }
+            // Require an actual `PATH=` assignment, not merely the substring "PATH":
+            // `export LOCAL_BIN_PATH="$HOME/.local/bin"` sets a different variable and
+            // must not count. The boundary excludes `…_PATH=` while allowing
+            // `export PATH=` / `PATH=` at line start.
+            return line.range(of: #"(^|[^A-Za-z0-9_])PATH="#, options: .regularExpression) != nil
         }
     }
 
