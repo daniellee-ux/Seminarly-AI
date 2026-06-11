@@ -275,7 +275,7 @@ struct SettingsView: View {
                 }
 
                 Section("About") {
-                    LabeledContent("Version", value: "1.0.0")
+                    LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                     Text("Seminarly uses local transcription (WhisperKit) and on-device audio capture (Core Audio Taps). Only the AI note-structuring call requires network access; costs depend on your selected provider's pricing.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
