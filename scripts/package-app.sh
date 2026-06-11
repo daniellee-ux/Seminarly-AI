@@ -76,7 +76,11 @@ OPTS_PLIST="$BUILD_DIR/ExportOptions.plist"
 note() { printf "\n▸ %s\n" "$*"; }
 
 # --- preflight ---------------------------------------------------------------
-if ! security find-identity -v -p codesigning | grep -q "$SIGN_ID"; then
+# Capture first, then match: piping into `grep -q` lets grep close the pipe on
+# the first match, which SIGPIPE-kills the writer; under `pipefail` that turns a
+# successful match into a non-zero pipeline (an intermittent false negative).
+IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+if ! grep -q "$SIGN_ID" <<<"$IDENTITIES"; then
   echo "✗ No '$SIGN_ID' certificate in the keychain. Create one in Xcode → Settings → Accounts → Manage Certificates." >&2
   exit 1
 fi
@@ -123,7 +127,8 @@ if [ ! -x "$HELPER" ]; then
   echo "  Check the 'seminarly-cli' embed dependency on the Seminarly target in project.yml." >&2
   exit 1
 fi
-if ! codesign -dv --verbose=4 "$HELPER" 2>&1 | grep -q 'flags=.*runtime'; then
+HELPER_SIG="$(codesign -dv --verbose=4 "$HELPER" 2>&1 || true)"
+if ! grep -q 'flags=.*runtime' <<<"$HELPER_SIG"; then
   echo "✗ Embedded CLI lacks hardened runtime — notarization would reject it." >&2
   exit 1
 fi
