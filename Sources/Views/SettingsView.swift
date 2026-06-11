@@ -27,6 +27,7 @@ struct SettingsView: View {
     @State private var cliTouchedPaths: [String] = []
     @State private var cliPathFile = "~/.zshrc"
     @State private var cliCanAutoPath = true
+    @State private var cliPathSnippet = SeminarlyCLIInstaller.pathExportLine
     @State private var cliStatus: String?
     @State private var cliError: String?
 
@@ -393,14 +394,14 @@ struct SettingsView: View {
                     }
                 } else {
                     // Non-bash/zsh shell (fish, tcsh, …): we can't safely auto-edit,
-                    // so guide instead of claiming success. Syntax below is bash/zsh.
-                    Text("Add `~/.local/bin` to your PATH in your shell's startup file:")
+                    // so guide with that shell's own syntax (see cliPathSnippet).
+                    Text("Add `~/.local/bin` to your PATH in your shell — e.g.:")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textTertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text(SeminarlyCLIInstaller.pathExportLine)
+                Text(cliPathSnippet)
                     .font(Typography.mono)
                     .foregroundStyle(SeminarlyColors.textTertiary)
                     .textSelection(.enabled)
@@ -426,6 +427,7 @@ struct SettingsView: View {
         cliTouchedPaths = installer.touchedPaths
         cliPathFile = installer.pathFileDisplayName
         cliCanAutoPath = installer.canAddToPathAutomatically
+        cliPathSnippet = installer.pathExportSnippet
     }
 
     private func installCLI() {

@@ -339,6 +339,13 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(makeInstaller(environment: ["SHELL": "/opt/homebrew/bin/fish"]).canAddToPathAutomatically)
     }
 
+    func testPathExportSnippetMatchesShellSyntax() {
+        XCTAssertEqual(makeInstaller(environment: ["SHELL": "/bin/zsh"]).pathExportSnippet,
+                       SeminarlyCLIInstaller.pathExportLine)
+        XCTAssertTrue(makeInstaller(environment: ["SHELL": "/usr/bin/fish"]).pathExportSnippet.hasPrefix("fish_add_path"))
+        XCTAssertTrue(makeInstaller(environment: ["SHELL": "/bin/tcsh"]).pathExportSnippet.hasPrefix("setenv PATH"))
+    }
+
     func testUnsupportedShellNeverReportsFalsePathSuccess() throws {
         // fish doesn't read ~/.zshrc, so a line there must not count as on-PATH.
         try "export PATH=\"$HOME/.local/bin:$PATH\"\n".write(

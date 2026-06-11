@@ -182,6 +182,17 @@ struct SeminarlyCLIInstaller {
     /// Tilde-path of ``pathFileToEdit`` for UI copy (e.g. "~/.zshrc").
     var pathFileDisplayName: String { "~/\(pathFileToEdit.lastPathComponent)" }
 
+    /// A copy-pasteable line that puts `~/.local/bin` on PATH in the user's shell
+    /// syntax — so the manual instructions shown for unsupported shells are actually
+    /// correct (pasting bash `export` into fish/tcsh would not work).
+    var pathExportSnippet: String {
+        switch loginShellName {
+        case "fish":         return #"fish_add_path "$HOME/.local/bin""#
+        case "tcsh", "csh":  return #"setenv PATH "$HOME/.local/bin:$PATH""#
+        default:             return Self.pathExportLine
+        }
+    }
+
     /// True if any *active* (non-comment) line actually puts `.local/bin` on `PATH`.
     /// Requires both `.local/bin` and `PATH` on the same line, so neither a `#`
     /// comment nor an unrelated mention (e.g. `mkdir -p "$HOME/.local/bin"`) counts —
