@@ -219,12 +219,31 @@ enum SpeakerPalette {
 
 // MARK: - Empty State
 
-struct SeminarlyEmptyState: View {
+struct SeminarlyEmptyState<Accessory: View>: View {
     let symbol: String
     let title: String
     var subtitle: String?
     var actionTitle: String?
     var action: (() -> Void)?
+    /// Optional quiet content shown beneath the primary action (e.g. a secondary
+    /// link-style offer). Defaults to nothing via the `EmptyView` convenience init.
+    @ViewBuilder var accessory: () -> Accessory
+
+    init(
+        symbol: String,
+        title: String,
+        subtitle: String? = nil,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil,
+        @ViewBuilder accessory: @escaping () -> Accessory
+    ) {
+        self.symbol = symbol
+        self.title = title
+        self.subtitle = subtitle
+        self.actionTitle = actionTitle
+        self.action = action
+        self.accessory = accessory
+    }
 
     var body: some View {
         VStack(spacing: Spacing.md) {
@@ -255,7 +274,28 @@ struct SeminarlyEmptyState: View {
                 }
                 .buttonStyle(.plain)
             }
+
+            accessory()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+extension SeminarlyEmptyState where Accessory == EmptyView {
+    init(
+        symbol: String,
+        title: String,
+        subtitle: String? = nil,
+        actionTitle: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.init(
+            symbol: symbol,
+            title: title,
+            subtitle: subtitle,
+            actionTitle: actionTitle,
+            action: action,
+            accessory: { EmptyView() }
+        )
     }
 }

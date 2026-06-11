@@ -5,6 +5,10 @@
 # Pipeline: xcodegen → archive (Release, hardened runtime, Developer ID) →
 # export signed .app → build .dmg (drag-to-Applications) → notarize → staple → verify.
 #
+# The archive also builds + embeds the bundled `seminarly-cli` (a target dependency
+# of the app) into Contents/Helpers, code-signed with hardened runtime alongside the
+# app — so it is notarized for free. No separate CLI build step is needed.
+#
 # Run from the repo root:  ./scripts/package-app.sh
 #
 # Prerequisites (one-time):
@@ -111,6 +115,20 @@ cat > "$OPTS_PLIST" <<PLIST
 PLIST
 xcodebuild -exportArchive -archivePath "$ARCHIVE" \
   -exportPath "$EXPORT_DIR" -exportOptionsPlist "$OPTS_PLIST" -quiet
+
+note "Verifying embedded seminarly-cli (present + hardened, fail fast before notarizing)"
+HELPER="$APP_PATH/Contents/Helpers/seminarly-cli"
+if [ ! -x "$HELPER" ]; then
+  echo "✗ Embedded CLI missing at Contents/Helpers/seminarly-cli." >&2
+  echo "  Check the 'seminarly-cli' embed dependency on the Seminarly target in project.yml." >&2
+  exit 1
+fi
+if ! codesign -dv --verbose=4 "$HELPER" 2>&1 | grep -q 'flags=.*runtime'; then
+  echo "✗ Embedded CLI lacks hardened runtime — notarization would reject it." >&2
+  exit 1
+fi
+codesign --verify --strict "$HELPER"
+echo "  ✓ Contents/Helpers/seminarly-cli — Developer ID, hardened, valid"
 
 note "Building styled DMG (dmgbuild — headless, no Finder/AppleScript)"
 DMGVENV="$PWD/.dmgvenv"

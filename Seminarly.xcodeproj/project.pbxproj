@@ -12,6 +12,7 @@
 		077D9F519D02E6C100B739AC /* SessionLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189EE3B1745B331CE700A4FC /* SessionLookup.swift */; };
 		08F978A443863CEEB70C3926 /* AudioFormatConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */; };
 		097A46D37CDCC3822A2241BF /* TemplateSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7EFEC64A836FC701F31232 /* TemplateSettings.swift */; };
+		09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */; };
 		0A486D6FC69BAB7431510694 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA68520F74553000BE94F18A /* KeychainStoreTests.swift */; };
 		138FDF555692413FC5D0AE68 /* AudioDetectionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */; };
 		176988E4F55C6A8E90D6C1AA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C186469B8F8014AFC557D7D /* ContentView.swift */; };
@@ -74,9 +75,11 @@
 		BA3EF45D20C4CD45A137D6B0 /* MarkdownListPrefixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4373F8BD4EEDAE9A4E7B5D60 /* MarkdownListPrefixTests.swift */; };
 		C58818FB8C29B6BEC7353882 /* DatabaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */; };
 		C6372F6144CBCC2F3FED70D1 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60EC4D05F182BD3B566B8B6A /* AudioCaptureManager.swift */; };
+		CAFC5F5320BF0383A2E99288 /* SKILL.md in CopyFiles */ = {isa = PBXBuildFile; fileRef = ADB62F2B16B3B5F970154451 /* SKILL.md */; };
 		CBD75ED7F232B718B51816A1 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 960B5416B0953F3EF88B3BAB /* RecordingView.swift */; };
 		CF1248057656049AD51D9F78 /* DatabaseRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */; };
 		D0E3FECE30E61AF212F99CF5 /* DatabaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */; };
+		D46F3FAED328DFD92EAFB3A1 /* seminarly-cli in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = F5C0129D5E06AEF21E0DE97E /* seminarly-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		DC0B405D28FFBEDDE284A205 /* GetCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D26185876B64E5A4D977EC7 /* GetCommand.swift */; };
 		DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */; };
 		E90A53D5B14AAAF64AC05CB2 /* DatabaseCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */; };
@@ -92,6 +95,7 @@
 		F8D591649E9948662F091233 /* LanguageAwareDiarizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */; };
 		F99B6713863C741BBF7230BA /* NotepadSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5668818DC5399A91AA48648 /* NotepadSurface.swift */; };
 		FC646DE91189E87133786696 /* SessionFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1893FC5504CE291132F1E35C /* SessionFormatter.swift */; };
+		FE398F3C3860F62E4DDCED9D /* SeminarlyCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -102,7 +106,38 @@
 			remoteGlobalIDString = DEAEBB26C57E4E200137B0AF;
 			remoteInfo = Seminarly;
 		};
+		A3903B3528C26E8876C2444F /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 609F74A7AB25ACBA3820231A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EC37D2EC782DAF208224020D;
+			remoteInfo = "seminarly-cli";
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		6080684F8D2514BC9511C046 /* CopyFiles */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "seminarly-cli";
+			dstSubfolderSpec = 7;
+			files = (
+				CAFC5F5320BF0383A2E99288 /* SKILL.md in CopyFiles */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C2A1037BFE745AE647B1BA1D /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				D46F3FAED328DFD92EAFB3A1 /* seminarly-cli in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingMarkdownRenderer.swift; sourceTree = "<group>"; };
@@ -154,9 +189,12 @@
 		960B5416B0953F3EF88B3BAB /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		9877B7574FD700253F62FF15 /* NeuralDiarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralDiarizationEngine.swift; sourceTree = "<group>"; };
 		9CFE1DF556BD19A1EB3CFF0D /* DiarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationEngine.swift; sourceTree = "<group>"; };
+		9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLIInstallerTests.swift; sourceTree = "<group>"; };
 		9F92D33D3963F33E09094FB5 /* AudioFormatConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFormatConverter.swift; sourceTree = "<group>"; };
 		A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFormatConverterTests.swift; sourceTree = "<group>"; };
 		AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDetectionBanner.swift; sourceTree = "<group>"; };
+		ADB62F2B16B3B5F970154451 /* SKILL.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SKILL.md; sourceTree = "<group>"; };
+		AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLIInstaller.swift; sourceTree = "<group>"; };
 		B10A19149E4315F1EE72FF60 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseStore.swift; sourceTree = "<group>"; };
 		BA68520F74553000BE94F18A /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
@@ -288,6 +326,15 @@
 			path = Providers;
 			sourceTree = "<group>";
 		};
+		6EBA5FFAA45918252BC40CCA /* seminarly-cli */ = {
+			isa = PBXGroup;
+			children = (
+				ADB62F2B16B3B5F970154451 /* SKILL.md */,
+			);
+			name = "seminarly-cli";
+			path = ".agents/skills/seminarly-cli";
+			sourceTree = "<group>";
+		};
 		6F2809C312E5A865DC74977A /* CLI */ = {
 			isa = PBXGroup;
 			children = (
@@ -301,6 +348,7 @@
 			isa = PBXGroup;
 			children = (
 				3D32E7DB3F42E21DBD50848C /* CLI */,
+				6EBA5FFAA45918252BC40CCA /* seminarly-cli */,
 				63098529147E5D5F34CA7E43 /* Sources */,
 				E917972C36E6B43A1C972A0D /* Tests */,
 				12F3CE12A8C38ED820F8D203 /* Products */,
@@ -358,6 +406,7 @@
 				24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */,
 				2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */,
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
+				9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */,
 				DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */,
 				11806D2BF8280456123BD8CF /* SpeakerClustererTests.swift */,
 				BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */,
@@ -387,6 +436,7 @@
 		EF8057A8371C0E25BAB39E92 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -437,11 +487,14 @@
 			buildPhases = (
 				E7A952F0392DF6572B98A50F /* Sources */,
 				FFCEC2F1A87CC8929336FC44 /* Resources */,
+				6080684F8D2514BC9511C046 /* CopyFiles */,
 				2E9EE3E063BEEE747B064B56 /* Frameworks */,
+				C2A1037BFE745AE647B1BA1D /* Embed Dependencies */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A4910EE20EAD1C7B53E4F976 /* PBXTargetDependency */,
 			);
 			name = Seminarly;
 			packageProductDependencies = (
@@ -539,6 +592,7 @@
 				5CAB6C3A7C986808A29C93EA /* NoteTemplateTests.swift in Sources */,
 				9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */,
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
+				09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */,
 				3086DF2F96EE20D942903C43 /* SessionFormatterTests.swift in Sources */,
 				71BBC281CAFAAB465CFFD11D /* SpeakerClustererTests.swift in Sources */,
 				45A19BA13654C5D30DDA98AC /* SummaryLanguageTests.swift in Sources */,
@@ -605,6 +659,7 @@
 				2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */,
 				CBD75ED7F232B718B51816A1 /* RecordingView.swift in Sources */,
 				F47FAEDEA65FB389F747480A /* SeminarlyApp.swift in Sources */,
+				FE398F3C3860F62E4DDCED9D /* SeminarlyCLIInstaller.swift in Sources */,
 				72FFEE7E8492CA98E107424A /* SeminarlySchemaV1.swift in Sources */,
 				FC646DE91189E87133786696 /* SessionFormatter.swift in Sources */,
 				34DC4012ED36C898D30FEB81 /* SessionLookup.swift in Sources */,
@@ -623,6 +678,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A4910EE20EAD1C7B53E4F976 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EC37D2EC782DAF208224020D /* seminarly-cli */;
+			targetProxy = A3903B3528C26E8876C2444F /* PBXContainerItemProxy */;
+		};
 		DACE87FFB9E628A983056834 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = DEAEBB26C57E4E200137B0AF /* Seminarly */;
@@ -701,7 +761,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "ai.seminarly.seminarly-cli";
 				PRODUCT_NAME = "seminarly-cli";
 				SDKROOT = macosx;
-				SKIP_INSTALL = NO;
+				SKIP_INSTALL = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Debug;
@@ -720,7 +780,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = "ai.seminarly.seminarly-cli";
 				PRODUCT_NAME = "seminarly-cli";
 				SDKROOT = macosx;
-				SKIP_INSTALL = NO;
+				SKIP_INSTALL = YES;
 				SWIFT_STRICT_CONCURRENCY = complete;
 			};
 			name = Release;
@@ -778,7 +838,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
@@ -801,7 +861,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.0;
+				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;

@@ -20,6 +20,8 @@ struct ContentView: View {
     @State private var viewingRecording = false
     @State private var isNarrow = false
     @State private var windowWidth: CGFloat = 1000
+    @State private var cliOfferConfirmation: String?
+    @State private var cliOfferError: String?
 
     @StateObject private var transcriptionEngine = TranscriptionEngine()
     @StateObject private var diarizationEngine = NeuralDiarizationEngine()
@@ -336,8 +338,72 @@ struct ContentView: View {
                     selectedMeeting = nil
                     showingRecording = true
                     viewingRecording = true
-                }
+                },
+                accessory: { cliOffer }
             )
+        }
+    }
+
+    /// A quiet, secondary offer shown beneath Start Recording — only when the CLI
+    /// isn't installed yet *and* the user runs a coding agent (a `~/.claude`,
+    /// `~/.codex`, … dir exists). Installs the bundled `seminarly-cli` + skill in
+    /// one click (symlinks only — the PATH edit stays a separate Settings opt-in),
+    /// then self-hides. No dismiss control: the offer is already narrow and the
+    /// empty state is transient.
+    @ViewBuilder
+    private var cliOffer: some View {
+        if let cliOfferConfirmation {
+            Label(cliOfferConfirmation, systemImage: "checkmark.circle")
+                .font(Typography.caption)
+                .foregroundStyle(SeminarlyColors.success)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 320)
+                .transition(.opacity)
+        } else if cliOfferVisible {
+            VStack(spacing: Spacing.xxs) {
+                Button {
+                    installCLIFromOffer()
+                } label: {
+                    Label("Let your coding agent read your sessions", systemImage: "terminal")
+                        .font(Typography.bodyMedium)
+                        .foregroundStyle(SeminarlyColors.accent)
+                }
+                .buttonStyle(.plain)
+                .help("Installs the seminarly-cli command and agent skill")
+
+                if let cliOfferError {
+                    Text(cliOfferError)
+                        .font(Typography.caption)
+                        .foregroundStyle(SeminarlyColors.destructive)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: 300)
+                }
+            }
+            .transition(.opacity)
+        }
+    }
+
+    private var cliOfferVisible: Bool {
+        let installer = SeminarlyCLIInstaller.bundled
+        return !installer.isInstalled && installer.hasAgentConfigDir
+    }
+
+    private func installCLIFromOffer() {
+        let installer = SeminarlyCLIInstaller.bundled
+        do {
+            try installer.install()
+            cliOfferError = nil
+            // Honest about PATH: install never edits the shell, so if ~/.local/bin
+            // isn't reachable, point the user to Settings where that opt-in lives.
+            let message = installer.localBinOnPath
+                ? "Installed — your coding agent can now read your sessions"
+                : "Installed — finish PATH setup in Settings"
+            withAnimation { cliOfferConfirmation = message }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+                withAnimation { cliOfferConfirmation = nil }
+            }
+        } catch {
+            cliOfferError = error.localizedDescription
         }
     }
 
