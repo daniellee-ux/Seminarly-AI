@@ -332,6 +332,31 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertTrue(installer.localBinOnPath)
     }
 
+    func testCanAddToPathAutomaticallyByShell() {
+        XCTAssertTrue(makeInstaller(environment: ["SHELL": "/bin/zsh"]).canAddToPathAutomatically)
+        XCTAssertTrue(makeInstaller(environment: ["SHELL": "/bin/bash"]).canAddToPathAutomatically)
+        XCTAssertTrue(makeInstaller(environment: [:]).canAddToPathAutomatically) // unset → zsh
+        XCTAssertFalse(makeInstaller(environment: ["SHELL": "/opt/homebrew/bin/fish"]).canAddToPathAutomatically)
+    }
+
+    func testUnsupportedShellNeverReportsFalsePathSuccess() throws {
+        // fish doesn't read ~/.zshrc, so a line there must not count as on-PATH.
+        try "export PATH=\"$HOME/.local/bin:$PATH\"\n".write(
+            to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/usr/bin/fish", "PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
+    func testAddLocalBinToPathThrowsForUnsupportedShell() {
+        let installer = makeInstaller(environment: ["SHELL": "/usr/bin/fish", "PATH": "/usr/bin:/bin"])
+        XCTAssertThrowsError(try installer.addLocalBinToPath()) { error in
+            guard case SeminarlyCLIInstaller.InstallError.unsupportedShellForPathEdit = error else {
+                return XCTFail("expected .unsupportedShellForPathEdit, got \(error)")
+            }
+        }
+        XCTAssertFalse(fm.fileExists(atPath: home.appendingPathComponent(".zshrc").path))
+    }
+
     func testAddLocalBinToPathAppendsOnceIdempotently() throws {
         let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
         try installer.addLocalBinToPath()

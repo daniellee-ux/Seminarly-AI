@@ -150,14 +150,26 @@ struct SeminarlyCLIInstaller {
         environment["SHELL"].map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
     }
 
+    /// Whether we can configure PATH automatically for this shell. bash and zsh
+    /// (and an unset `$SHELL`, treated as the macOS-default zsh) use `export PATH=…`
+    /// in known files. fish, tcsh, etc. use different syntax and locations, so we
+    /// don't auto-edit them — the UI shows manual guidance rather than claiming
+    /// success on a file the shell never reads.
+    var canAddToPathAutomatically: Bool {
+        ["", "zsh", "bash"].contains(loginShellName)
+    }
+
     /// Startup files the user's *actual* login shell reads. Scanning a bash user's
     /// `~/.bash_profile` for a zsh user (or vice-versa) would wrongly conclude PATH
-    /// is set, since the active shell never sources it. Unknown/unset shells default
-    /// to zsh — the macOS default — which still only over-reports for the rare
-    /// non-zsh user with stray zsh config (and the worst case is a harmless extra
-    /// "Add to PATH" prompt, never a hidden one).
+    /// is set, since the active shell never sources it. Unsupported shells scan
+    /// nothing — we won't guess at files we can't reliably edit — so `localBinOnPath`
+    /// falls back to the inherited environment only and never claims false success.
     private var shellStartupFileNames: [String] {
-        loginShellName == "bash" ? [".bash_profile", ".bashrc", ".profile"] : [".zshrc", ".zprofile", ".zshenv"]
+        switch loginShellName {
+        case "bash":    return [".bash_profile", ".bashrc", ".profile"]
+        case "", "zsh": return [".zshrc", ".zprofile", ".zshenv"]
+        default:        return []
+        }
     }
 
     /// The startup file `addLocalBinToPath()` writes to — chosen so it's one of the
@@ -229,8 +241,10 @@ struct SeminarlyCLIInstaller {
     }
 
     /// The one consent-sensitive bit, kept isolated from ``install()``: append the
-    /// PATH line to ~/.zshrc. Idempotent; safe to call when the file is missing.
+    /// PATH line to the shell startup file. Idempotent; safe when the file is
+    /// missing. Only valid for shells we support (see ``canAddToPathAutomatically``).
     func addLocalBinToPath() throws {
+        guard canAddToPathAutomatically else { throw InstallError.unsupportedShellForPathEdit }
         let target = pathFileToEdit
         let existing = (try? String(contentsOf: target, encoding: .utf8)) ?? ""
         guard !Self.hasActiveLocalBinLine(in: existing) else { return }
@@ -286,6 +300,7 @@ struct SeminarlyCLIInstaller {
         case bundledBinaryMissing
         case bundledSkillMissing
         case bundleLocationUnstable
+        case unsupportedShellForPathEdit
         case pathOccupied(URL)
 
         var errorDescription: String? {
@@ -296,6 +311,8 @@ struct SeminarlyCLIInstaller {
                 return "The bundled agent skill wasn't found inside the app. Try reinstalling Seminarly."
             case .bundleLocationUnstable:
                 return "Move Seminarly to your Applications folder, then install — it's running from a temporary or read-only location (such as the disk image), and the link would break when that goes away."
+            case .unsupportedShellForPathEdit:
+                return "Add ~/.local/bin to your PATH in your shell's startup file — Seminarly only edits PATH automatically for bash and zsh."
             case .pathOccupied(let url):
                 return "\(url.path) already exists and isn't a Seminarly symlink. Remove it by hand, then try again."
             }

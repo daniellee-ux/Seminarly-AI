@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var cliOnPath = true
     @State private var cliTouchedPaths: [String] = []
     @State private var cliPathFile = "~/.zshrc"
+    @State private var cliCanAutoPath = true
     @State private var cliStatus: String?
     @State private var cliError: String?
 
@@ -372,22 +373,31 @@ struct SettingsView: View {
                     .foregroundStyle(SeminarlyColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                HStack(spacing: Spacing.sm) {
-                    Button {
-                        addCLIToPath()
-                    } label: {
-                        Text("Add to PATH")
-                            .font(Typography.captionMedium)
-                            .foregroundStyle(SeminarlyColors.textPrimary)
-                            .padding(.horizontal, Spacing.sm)
-                            .padding(.vertical, Spacing.xxs)
-                            .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
-                    }
-                    .buttonStyle(.plain)
+                if cliCanAutoPath {
+                    HStack(spacing: Spacing.sm) {
+                        Button {
+                            addCLIToPath()
+                        } label: {
+                            Text("Add to PATH")
+                                .font(Typography.captionMedium)
+                                .foregroundStyle(SeminarlyColors.textPrimary)
+                                .padding(.horizontal, Spacing.sm)
+                                .padding(.vertical, Spacing.xxs)
+                                .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
 
-                    Text("appends one line to \(cliPathFile)")
+                        Text("appends one line to \(cliPathFile)")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textTertiary)
+                    }
+                } else {
+                    // Non-bash/zsh shell (fish, tcsh, …): we can't safely auto-edit,
+                    // so guide instead of claiming success. Syntax below is bash/zsh.
+                    Text("Add `~/.local/bin` to your PATH in your shell's startup file:")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Text(SeminarlyCLIInstaller.pathExportLine)
@@ -415,6 +425,7 @@ struct SettingsView: View {
         cliOnPath = installer.localBinOnPath
         cliTouchedPaths = installer.touchedPaths
         cliPathFile = installer.pathFileDisplayName
+        cliCanAutoPath = installer.canAddToPathAutomatically
     }
 
     private func installCLI() {
