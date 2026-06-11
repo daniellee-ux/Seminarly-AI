@@ -10,8 +10,8 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Semi
 /// Install is **symlink-based**: the binary symlink points into the app bundle, so
 /// the CLI auto-tracks every app update and always matches the SwiftData schema it
 /// reads. Install state is therefore just *installed / not-installed* — no version
-/// compare. "Installed" = our `~/.local/bin/seminarly-cli` symlink exists and
-/// resolves into an app bundle's `Contents/Helpers`.
+/// compare. "Installed" = both our binary and skill symlinks exist and resolve
+/// into the app bundle (the CLI without its skill is a broken half-install).
 ///
 /// The struct is configured with its inputs (home dir, bundled binary, bundled
 /// skill folder, environment) so it can be exercised against a temp directory in
@@ -83,15 +83,41 @@ struct SeminarlyCLIInstaller {
         }
     }
 
-    /// True when our binary symlink exists and resolves into an app bundle.
+    /// True only when *both* our binary and canonical-skill symlinks exist and
+    /// resolve into an app bundle. Requiring both means a partially-removed install
+    /// (e.g. the user deleted the skill link, or it failed to link) reads as "not
+    /// installed", so the UI re-offers Install instead of hiding it — the CLI without
+    /// its skill leaves the advertised agent access broken.
     var isInstalled: Bool {
-        // Must be a symlink (this succeeds even for a dangling one).
-        guard (try? fileManager.destinationOfSymbolicLink(atPath: binLink.path)) != nil else {
+        symlinkResolvesIntoBundle(binLink, suffix: "Contents/Helpers/seminarly-cli")
+            && symlinkResolvesIntoBundle(canonicalSkillDir, suffix: "Contents/Resources/seminarly-cli")
+    }
+
+    /// True if `link` is a symlink whose target exists and ends with `suffix` — i.e.
+    /// it resolves into the app bundle. Dangling or non-bundle links report false.
+    private func symlinkResolvesIntoBundle(_ link: URL, suffix: String) -> Bool {
+        guard (try? fileManager.destinationOfSymbolicLink(atPath: link.path)) != nil else { return false }
+        let resolved = link.resolvingSymlinksInPath().path
+        return resolved.hasSuffix(suffix) && fileManager.fileExists(atPath: resolved)
+    }
+
+    /// Whether the app is running from a durable location. Launched from a mounted
+    /// DMG or a Gatekeeper App Translocation path, `Bundle.main.bundleURL` is a
+    /// temporary/read-only location; symlinking into it would dangle the moment the
+    /// user ejects the DMG or moves the app. Install refuses until it's stable.
+    var isBundleLocationStable: Bool {
+        guard let binary = bundledBinary else { return false }
+        // Gatekeeper App Translocation copies the app to a randomized temp mount.
+        if binary.path.contains("/AppTranslocation/") { return false }
+        // A read-only volume is almost certainly a mounted disk image.
+        let bundle = binary.deletingLastPathComponent()  // …/Contents/Helpers
+            .deletingLastPathComponent()                 // …/Contents
+            .deletingLastPathComponent()                 // …/Seminarly.app
+        if let values = try? bundle.resourceValues(forKeys: [.volumeIsReadOnlyKey]),
+           values.volumeIsReadOnly == true {
             return false
         }
-        let resolved = binLink.resolvingSymlinksInPath().path
-        return resolved.hasSuffix("Contents/Helpers/seminarly-cli")
-            && fileManager.fileExists(atPath: resolved)
+        return true
     }
 
     /// True if `~/.local/bin` is already reachable — either exported in the
@@ -109,9 +135,20 @@ struct SeminarlyCLIInstaller {
         for name in [".zshrc", ".zprofile", ".bash_profile", ".bashrc", ".profile"] {
             let url = home.appending(path: name)
             guard let contents = try? String(contentsOf: url, encoding: .utf8) else { continue }
-            if contents.contains(".local/bin") { return true }
+            if Self.hasActiveLocalBinLine(in: contents) { return true }
         }
         return false
+    }
+
+    /// True if any *active* (non-comment) line references `.local/bin`. A mention
+    /// only inside a `#` comment doesn't count — otherwise we'd wrongly conclude the
+    /// dir is already on PATH and hide the opt-in (and `addLocalBinToPath()` would
+    /// no-op) even though a new shell still wouldn't resolve `seminarly-cli`.
+    static func hasActiveLocalBinLine(in contents: String) -> Bool {
+        contents.split(whereSeparator: \.isNewline).contains { rawLine in
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            return !line.hasPrefix("#") && line.contains(".local/bin")
+        }
     }
 
     // MARK: - Install / uninstall
@@ -119,6 +156,8 @@ struct SeminarlyCLIInstaller {
     func install() throws {
         guard let binary = bundledBinary else { throw InstallError.bundledBinaryMissing }
         guard let skillDir = bundledSkillDir else { throw InstallError.bundledSkillMissing }
+        // Don't symlink into a DMG / translocated copy — those paths vanish.
+        guard isBundleLocationStable else { throw InstallError.bundleLocationUnstable }
 
         // Preflight so install is atomic: if any target is a real (non-symlink)
         // file/dir we'd refuse to clobber, fail *before* creating anything rather
@@ -162,7 +201,7 @@ struct SeminarlyCLIInstaller {
     func addLocalBinToPath() throws {
         let zshrc = home.appending(path: ".zshrc")
         let existing = (try? String(contentsOf: zshrc, encoding: .utf8)) ?? ""
-        guard !existing.contains(".local/bin") else { return }
+        guard !Self.hasActiveLocalBinLine(in: existing) else { return }
         let separator = existing.isEmpty || existing.hasSuffix("\n") ? "" : "\n"
         let block = "\(separator)\n# Added by Seminarly — exposes seminarly-cli on your PATH\n\(Self.pathExportLine)\n"
         try (existing + block).write(to: zshrc, atomically: true, encoding: .utf8)
@@ -196,6 +235,7 @@ struct SeminarlyCLIInstaller {
     enum InstallError: LocalizedError {
         case bundledBinaryMissing
         case bundledSkillMissing
+        case bundleLocationUnstable
         case pathOccupied(URL)
 
         var errorDescription: String? {
@@ -204,6 +244,8 @@ struct SeminarlyCLIInstaller {
                 return "The bundled seminarly-cli wasn't found inside the app. Try reinstalling Seminarly."
             case .bundledSkillMissing:
                 return "The bundled agent skill wasn't found inside the app. Try reinstalling Seminarly."
+            case .bundleLocationUnstable:
+                return "Move Seminarly to your Applications folder, then install — it's running from a temporary or read-only location (such as the disk image), and the link would break when that goes away."
             case .pathOccupied(let url):
                 return "\(url.path) already exists and isn't a Seminarly symlink. Remove it by hand, then try again."
             }

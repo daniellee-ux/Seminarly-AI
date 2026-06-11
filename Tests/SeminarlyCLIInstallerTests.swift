@@ -139,6 +139,21 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         }
     }
 
+    func testInstallRefusesTranslocatedBundle() {
+        // Gatekeeper App Translocation runs the app from a randomized temp path;
+        // symlinking into it would dangle once the user moves the app.
+        let translocated = URL(fileURLWithPath:
+            "/private/var/folders/ab/AppTranslocation/ABC-123/d/Seminarly.app/Contents/Helpers/seminarly-cli")
+        let installer = makeInstaller(binary: .some(translocated))
+        XCTAssertFalse(installer.isBundleLocationStable)
+        XCTAssertThrowsError(try installer.install()) { error in
+            guard case SeminarlyCLIInstaller.InstallError.bundleLocationUnstable = error else {
+                return XCTFail("expected .bundleLocationUnstable, got \(error)")
+            }
+        }
+        XCTAssertNil(symlinkTarget(installer.binLink))
+    }
+
     // MARK: - uninstall
 
     func testUninstallRemovesOurSymlinks() throws {
@@ -176,6 +191,17 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertFalse(installer.isInstalled)
     }
 
+    func testIsInstalledFalseWhenSkillLinkMissing() throws {
+        let installer = makeInstaller()
+        try installer.install()
+        XCTAssertTrue(installer.isInstalled)
+        // A CLI without its skill is a broken half-install — remove just the skill
+        // link; isInstalled must report false so the UI re-offers Install.
+        try fm.removeItem(at: installer.canonicalSkillDir)
+        XCTAssertNotNil(symlinkTarget(installer.binLink))   // binary link still present
+        XCTAssertFalse(installer.isInstalled)
+    }
+
     // MARK: - coding-agent detection
 
     func testHasAgentConfigDirFalseWhenNonePresent() {
@@ -208,6 +234,26 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
     func testLocalBinNotOnPath() {
         let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
         XCTAssertFalse(installer.localBinOnPath)
+    }
+
+    func testLocalBinOnPathIgnoresCommentedShellLine() throws {
+        // A mention only inside a comment must NOT count as already-on-PATH.
+        try "# export PATH=\"$HOME/.local/bin:$PATH\"\n".write(
+            to: home.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
+    func testAddLocalBinToPathAppendsWhenOnlyCommentPresent() throws {
+        let zshrc = home.appendingPathComponent(".zshrc")
+        try "# a note mentioning .local/bin but not active\n".write(to: zshrc, atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)   // comment doesn't count
+
+        try installer.addLocalBinToPath()
+        let contents = try String(contentsOf: zshrc, encoding: .utf8)
+        XCTAssertTrue(contents.contains(SeminarlyCLIInstaller.pathExportLine))
+        XCTAssertTrue(installer.localBinOnPath)    // now an active line exists
     }
 
     func testAddLocalBinToPathAppendsOnceIdempotently() throws {
