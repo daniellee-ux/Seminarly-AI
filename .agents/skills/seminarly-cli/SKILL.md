@@ -29,7 +29,10 @@ seminarly-cli search "OKR"                      # JSON matches with snippets
 seminarly-cli path                              # store location (debug)
 ```
 
-If `seminarly-cli` is not on `$PATH`, ask the user to run `./scripts/install-global.sh` from the Seminarly repo (builds the binary, sets up the skill, adds `~/.local/bin` to PATH). For a one-off in-repo use, `./scripts/build-cli.sh && ./Tools/seminarly-cli ...` also works.
+If `seminarly-cli` is not on `$PATH`:
+
+- **If the user has the Seminarly app** (the common case — this skill ships inside it): tell them to open **Seminarly → Settings → Seminarly CLI and Skills**, where **Install** sets up the command + skill and the **Add to PATH** option exposes it. The bundled binary already lives at `Seminarly.app/Contents/Helpers/seminarly-cli`, so a full path works immediately too.
+- **If the user has the source repo**: `./scripts/install-global.sh` (builds the binary, sets up the skill, adds `~/.local/bin` to PATH), or `./scripts/build-cli.sh && ./Tools/seminarly-cli ...` for a one-off in-repo run.
 
 ## Three data types
 
@@ -74,4 +77,4 @@ Don't dump raw transcripts unless asked — prefer the enhanced notes or summari
 
 - `No session with id '<x>'`: the user probably renamed a session since you last called `list`. Re-run `list` and try again.
 - `No sessions found`: the store is empty. Confirm with `seminarly-cli path` that the path exists.
-- Build error / binary missing: ask the user to run `./scripts/install-global.sh` (one-time setup, requires XcodeGen) or `./scripts/build-cli.sh` for an in-repo-only build.
+- Binary missing / not found: with the app, **Seminarly → Settings → Seminarly CLI and Skills → Install** (re)creates the link; with the repo, `./scripts/install-global.sh` (one-time setup, requires XcodeGen) or `./scripts/build-cli.sh` for an in-repo-only build.

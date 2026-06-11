@@ -80,6 +80,19 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertEqual(symlinkTarget(installer.claudeSkillDir), installer.canonicalSkillDir.path)
     }
 
+    func testInstallSkipsClaudeCompatWhenClaudeIsRegularFile() throws {
+        let installer = makeInstaller()
+        // ~/.claude as a plain file must not pull in the optional compat link and
+        // abort the whole install — the required binary + skill links still land.
+        XCTAssertTrue(fm.createFile(atPath: home.appendingPathComponent(".claude").path, contents: Data()))
+
+        try installer.install() // must NOT throw
+        XCTAssertEqual(symlinkTarget(installer.binLink), bundleBinary.path)
+        XCTAssertEqual(symlinkTarget(installer.canonicalSkillDir), bundleSkillDir.path)
+        XCTAssertNil(symlinkTarget(installer.claudeSkillDir))
+        XCTAssertTrue(installer.isInstalled)
+    }
+
     func testInstallIsIdempotent() throws {
         let installer = makeInstaller()
         try installer.install()

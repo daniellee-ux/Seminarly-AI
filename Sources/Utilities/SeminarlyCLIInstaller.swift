@@ -61,7 +61,7 @@ struct SeminarlyCLIInstaller {
     /// explicit opt-in (see ``localBinOnPath`` / ``addLocalBinToPath()``).
     var touchedPaths: [String] {
         var paths = ["~/.local/bin/seminarly-cli", "~/.agents/skills/seminarly-cli"]
-        if fileManager.fileExists(atPath: home.appending(path: ".claude").path) {
+        if claudeDirExists {
             paths.append("~/.claude/skills/seminarly-cli")
         }
         return paths
@@ -76,12 +76,13 @@ struct SeminarlyCLIInstaller {
 
     /// True if any known coding-agent directory exists under home.
     var hasAgentConfigDir: Bool {
-        Self.agentConfigDirNames.contains { name in
-            var isDir: ObjCBool = false
-            let exists = fileManager.fileExists(atPath: home.appending(path: name).path, isDirectory: &isDir)
-            return exists && isDir.boolValue
-        }
+        Self.agentConfigDirNames.contains { isExistingDirectory(home.appending(path: $0)) }
     }
+
+    /// True if `~/.claude` exists *as a directory* — gates the optional Claude Code
+    /// compat link. A plain file there must not pull the link into the install (it
+    /// would then fail to `mkdir ~/.claude/skills` and abort the whole install).
+    private var claudeDirExists: Bool { isExistingDirectory(home.appending(path: ".claude")) }
 
     /// True only when *both* our binary and canonical-skill symlinks exist and
     /// resolve into an app bundle. Requiring both means a partially-removed install
@@ -166,7 +167,7 @@ struct SeminarlyCLIInstaller {
         // exists) the Claude Code compat link pointing at the canonical one.
         var links = [(link: binLink, destination: binary),
                      (link: canonicalSkillDir, destination: skillDir)]
-        if fileManager.fileExists(atPath: home.appending(path: ".claude").path) {
+        if claudeDirExists {
             links.append((link: claudeSkillDir, destination: canonicalSkillDir))
         }
 
@@ -233,6 +234,12 @@ struct SeminarlyCLIInstaller {
     private func isOccupiedByRealFile(_ url: URL) -> Bool {
         (try? fileManager.destinationOfSymbolicLink(atPath: url.path)) == nil
             && fileManager.fileExists(atPath: url.path)
+    }
+
+    /// True if a directory (not a file, not absent) exists at `url`.
+    private func isExistingDirectory(_ url: URL) -> Bool {
+        var isDir: ObjCBool = false
+        return fileManager.fileExists(atPath: url.path, isDirectory: &isDir) && isDir.boolValue
     }
 
     /// Replace whatever is at `link` with a symlink to `dest`. Replaces an existing
