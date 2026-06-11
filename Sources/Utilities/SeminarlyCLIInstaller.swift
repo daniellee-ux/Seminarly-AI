@@ -227,29 +227,36 @@ struct SeminarlyCLIInstaller {
         // Don't symlink into a DMG / translocated copy — those paths vanish.
         guard isBundleLocationStable else { throw InstallError.bundleLocationUnstable }
 
-        // The links we create: binary, canonical skill, and (only if ~/.claude
-        // exists) the Claude Code compat link pointing at the canonical one.
-        var links = [(link: binLink, destination: binary),
-                     (link: canonicalSkillDir, destination: skillDir)]
-        if claudeDirExists {
-            links.append((link: claudeSkillDir, destination: canonicalSkillDir))
-        }
+        // The *required* links: the binary and the canonical skill. The install
+        // succeeds or fails on these together.
+        let required = [(link: binLink, destination: binary),
+                        (link: canonicalSkillDir, destination: skillDir)]
 
         // Preflight so install is atomic — do everything that can fail *before*
         // creating any symlink: (1) refuse to clobber a real file/dir at a target,
         // and (2) create every parent directory up front, so e.g. a regular file at
         // ~/.agents can't leave the binary linked but the skill not. Stale/own
         // symlinks are replaceable, so they don't count as occupied.
-        if let occupied = links.first(where: { isOccupiedByRealFile($0.link) })?.link {
+        if let occupied = required.first(where: { isOccupiedByRealFile($0.link) })?.link {
             throw InstallError.pathOccupied(occupied)
         }
-        for (link, _) in links {
+        for (link, _) in required {
             try createParentDirectory(for: link)
         }
-
-        // Parents exist and targets are free — now create the symlinks.
-        for (link, destination) in links {
+        for (link, destination) in required {
             try replaceSymlink(at: link, withDestination: destination)
+        }
+
+        // The Claude Code compat link is *optional* and best-effort: a leftover real
+        // file/dir there (or a failing mkdir) must not block the install for every
+        // other agent, so skip it on any problem instead of aborting.
+        if claudeDirExists, !isOccupiedByRealFile(claudeSkillDir) {
+            do {
+                try createParentDirectory(for: claudeSkillDir)
+                try replaceSymlink(at: claudeSkillDir, withDestination: canonicalSkillDir)
+            } catch {
+                logger.notice("Skipped optional Claude compat link: \(error.localizedDescription, privacy: .public)")
+            }
         }
         logger.notice("Installed seminarly-cli + skill (binary → \(binary.path, privacy: .public))")
     }

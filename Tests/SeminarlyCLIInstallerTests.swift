@@ -80,6 +80,24 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertEqual(symlinkTarget(installer.claudeSkillDir), installer.canonicalSkillDir.path)
     }
 
+    func testInstallSucceedsWhenClaudeCompatPathOccupied() throws {
+        try fm.createDirectory(at: home.appendingPathComponent(".claude"), withIntermediateDirectories: true)
+        let installer = makeInstaller()
+        // A real dir from a prior manual setup where the optional compat link goes.
+        try fm.createDirectory(at: installer.claudeSkillDir, withIntermediateDirectories: true)
+        let sentinel = installer.claudeSkillDir.appendingPathComponent("SKILL.md")
+        try "mine".write(to: sentinel, atomically: true, encoding: .utf8)
+
+        // The optional compat link must NOT block the required install.
+        try installer.install()
+        XCTAssertEqual(symlinkTarget(installer.binLink), bundleBinary.path)
+        XCTAssertEqual(symlinkTarget(installer.canonicalSkillDir), bundleSkillDir.path)
+        XCTAssertTrue(installer.isInstalled)
+        // The occupied path is left untouched (still the user's real dir).
+        XCTAssertNil(symlinkTarget(installer.claudeSkillDir))
+        XCTAssertEqual(try? String(contentsOf: sentinel, encoding: .utf8), "mine")
+    }
+
     func testInstallSkipsClaudeCompatWhenClaudeIsRegularFile() throws {
         let installer = makeInstaller()
         // ~/.claude as a plain file must not pull in the optional compat link and
