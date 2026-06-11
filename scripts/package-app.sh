@@ -9,10 +9,14 @@
 #
 # Prerequisites (one-time):
 #   1. A "Developer ID Application" certificate in your login keychain.
-#   2. A notarytool keychain profile (default name: seminarly-notary), created with:
+#   2. Notary credentials — EITHER (preferred, fully headless):
+#        an App Store Connect API key, via NOTARY_KEY / NOTARY_KEY_ID / NOTARY_ISSUER
+#        env vars, or auto-discovered from the `asc` CLI store (~/.asc, active account);
+#      OR a notarytool keychain profile (default: seminarly-notary):
 #        xcrun notarytool store-credentials seminarly-notary \
 #          --apple-id "<your-apple-id-email>" --team-id ZPW87426K2
-#      (it will prompt for an app-specific password from appleid.apple.com)
+#      Note: keychain-profile notarization can fail from non-interactive shells (the
+#      credential's keychain is session-bound); the API key avoids that entirely.
 #
 set -euo pipefail
 
@@ -27,11 +31,38 @@ TEAM_ID="ZPW87426K2"
 SIGN_ID="Developer ID Application"
 NOTARY_PROFILE="${NOTARY_PROFILE:-seminarly-notary}"
 
+# --- notary auth: App Store Connect API key (headless), else keychain profile ----
+# Honour explicit env vars first; otherwise auto-discover from the `asc` CLI store.
+ASC_DIR="${ASC_DIR:-$HOME/.asc}"
+NOTARY_KEY="${NOTARY_KEY:-}"
+NOTARY_KEY_ID="${NOTARY_KEY_ID:-}"
+NOTARY_ISSUER="${NOTARY_ISSUER:-}"
+if [ -z "$NOTARY_KEY_ID" ] && [ -f "$ASC_DIR/credentials.json" ]; then
+  eval "$(ASC_DIR="$ASC_DIR" python3 - <<'PY' 2>/dev/null || true
+import json, os
+d = json.load(open(os.path.join(os.environ["ASC_DIR"], "credentials.json")))
+a = d.get("accounts")
+acct = a.get(d.get("active")) if isinstance(a, dict) else None
+if acct:
+    kid, iss = acct.get("keyID", ""), acct.get("issuerID", "")
+    p8 = os.path.join(os.environ["ASC_DIR"], "AuthKey_%s.p8" % kid)
+    print("NOTARY_KEY_ID=%r" % kid)
+    print("NOTARY_ISSUER=%r" % iss)
+    if os.path.exists(p8):
+        print("NOTARY_KEY=%r" % p8)
+PY
+)"
+fi
+if [ -n "$NOTARY_KEY" ] && [ -n "$NOTARY_KEY_ID" ] && [ -n "$NOTARY_ISSUER" ]; then
+  USE_API_KEY=true
+else
+  USE_API_KEY=false
+fi
+
 BUILD_DIR="build/dist"
 ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
 EXPORT_DIR="$BUILD_DIR/export"
 APP_PATH="$EXPORT_DIR/$APP_NAME.app"
-DMG_STAGE="$BUILD_DIR/dmg-stage"
 DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
 OPTS_PLIST="$BUILD_DIR/ExportOptions.plist"
 
@@ -42,8 +73,13 @@ if ! security find-identity -v -p codesigning | grep -q "$SIGN_ID"; then
   echo "✗ No '$SIGN_ID' certificate in the keychain. Create one in Xcode → Settings → Accounts → Manage Certificates." >&2
   exit 1
 fi
-if ! xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
-  echo "✗ notarytool profile '$NOTARY_PROFILE' not found. Create it with:" >&2
+if [ "$USE_API_KEY" = true ]; then
+  echo "▸ Notary auth: App Store Connect API key ($NOTARY_KEY_ID, headless)"
+elif xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
+  echo "▸ Notary auth: keychain profile '$NOTARY_PROFILE'"
+else
+  echo "✗ No notary credentials. Provide an App Store Connect API key (~/.asc, or" >&2
+  echo "  NOTARY_KEY / NOTARY_KEY_ID / NOTARY_ISSUER), or create a keychain profile:" >&2
   echo "    xcrun notarytool store-credentials $NOTARY_PROFILE --apple-id <id> --team-id $TEAM_ID" >&2
   exit 1
 fi
@@ -85,7 +121,11 @@ rm -f "$DMG_PATH"
   "$APP_NAME" "$DMG_PATH"
 
 note "Notarizing (a few minutes — Apple inspects the app inside)"
-xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+if [ "$USE_API_KEY" = true ]; then
+  xcrun notarytool submit "$DMG_PATH" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
+else
+  xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
+fi
 
 note "Stapling the ticket"
 xcrun stapler staple "$DMG_PATH"
