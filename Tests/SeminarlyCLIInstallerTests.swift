@@ -304,6 +304,21 @@ final class SeminarlyCLIInstallerTests: XCTestCase {
         XCTAssertTrue(installer.localBinOnPath)    // now an active line exists
     }
 
+    func testLocalBinOnPathIgnoresOtherShellProfile() throws {
+        // A zsh user's stale ~/.bash_profile must not count — zsh won't source it.
+        try "export PATH=\"$HOME/.local/bin:$PATH\"\n".write(
+            to: home.appendingPathComponent(".bash_profile"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/bin/zsh", "PATH": "/usr/bin:/bin"])
+        XCTAssertFalse(installer.localBinOnPath)
+    }
+
+    func testLocalBinOnPathViaBashProfileForBashUser() throws {
+        try "export PATH=\"$HOME/.local/bin:$PATH\"\n".write(
+            to: home.appendingPathComponent(".bash_profile"), atomically: true, encoding: .utf8)
+        let installer = makeInstaller(environment: ["SHELL": "/bin/bash", "PATH": "/usr/bin:/bin"])
+        XCTAssertTrue(installer.localBinOnPath)
+    }
+
     func testAddLocalBinToPathAppendsOnceIdempotently() throws {
         let installer = makeInstaller(environment: ["PATH": "/usr/bin:/bin"])
         try installer.addLocalBinToPath()

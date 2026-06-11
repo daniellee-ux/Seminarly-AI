@@ -136,12 +136,26 @@ struct SeminarlyCLIInstaller {
     }
 
     private func shellConfigReferencesLocalBin() -> Bool {
-        for name in [".zshrc", ".zprofile", ".bash_profile", ".bashrc", ".profile"] {
+        for name in shellStartupFileNames {
             let url = home.appending(path: name)
             guard let contents = try? String(contentsOf: url, encoding: .utf8) else { continue }
             if Self.hasActiveLocalBinLine(in: contents) { return true }
         }
         return false
+    }
+
+    /// Startup files the user's *actual* login shell reads. Scanning a bash user's
+    /// `~/.bash_profile` for a zsh user (or vice-versa) would wrongly conclude PATH
+    /// is set, since the active shell never sources it. Unknown/unset shells default
+    /// to zsh — the macOS default — which still only over-reports for the rare
+    /// non-zsh user with stray zsh config (and the worst case is a harmless extra
+    /// "Add to PATH" prompt, never a hidden one).
+    private var shellStartupFileNames: [String] {
+        let shell = environment["SHELL"].map { URL(fileURLWithPath: $0).lastPathComponent } ?? ""
+        switch shell {
+        case "bash": return [".bash_profile", ".bashrc", ".profile"]
+        default:     return [".zshrc", ".zprofile", ".zshenv"]
+        }
     }
 
     /// True if any *active* (non-comment) line actually puts `.local/bin` on `PATH`.
