@@ -21,6 +21,13 @@ struct SettingsView: View {
     @State private var summaryLanguagePickerSelection: SummaryLanguage = .matchTranscript
     @State private var summaryLanguageCustomDraft: String = ""
 
+    // Coding Agents (bundled seminarly-cli + skill) install state.
+    @State private var cliInstalled = false
+    @State private var cliOnPath = true
+    @State private var cliTouchedPaths: [String] = []
+    @State private var cliStatus: String?
+    @State private var cliError: String?
+
     let whisperModels = [
         "openai_whisper-large-v3-v20240930_turbo",
         "openai_whisper-large-v3-v20240930",
@@ -260,6 +267,10 @@ struct SettingsView: View {
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
 
+                Section("Seminarly CLI and Skills") {
+                    cliAndSkillsSection
+                }
+
                 Section("About") {
                     LabeledContent("Version", value: "1.0.0")
                     Text("Seminarly uses local transcription (WhisperKit) and on-device audio capture (Core Audio Taps). Only the AI note-structuring call requires network access; costs depend on your selected provider's pricing.")
@@ -288,6 +299,159 @@ struct SettingsView: View {
             refreshAPIKeyState()
             modelDraft = llmSettings.currentModel
             syncSummaryLanguagePickerFromSettings()
+            refreshCLIState()
+        }
+    }
+
+    // MARK: - Coding Agents
+
+    @ViewBuilder
+    private var cliAndSkillsSection: some View {
+        HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                Text(cliInstalled ? "Installed" : "Not installed")
+                    .font(Typography.bodyMedium)
+                    .foregroundStyle(cliInstalled ? SeminarlyColors.success : SeminarlyColors.textPrimary)
+                Text("Let your coding agent — Claude Code, Codex, Cursor, Gemini — read your sessions by installing the seminarly-cli command and its agent skill.")
+                    .font(Typography.caption)
+                    .foregroundStyle(SeminarlyColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: Spacing.sm)
+
+            if cliInstalled {
+                Button {
+                    uninstallCLI()
+                } label: {
+                    Text("Uninstall")
+                        .font(Typography.captionMedium)
+                        .foregroundStyle(SeminarlyColors.destructive)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs)
+                        .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    installCLI()
+                } label: {
+                    Text("Install")
+                        .font(Typography.captionMedium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs)
+                        .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+
+        DisclosureGroup("What this touches") {
+            VStack(alignment: .leading, spacing: Spacing.xxs) {
+                ForEach(cliTouchedPaths, id: \.self) { path in
+                    Text(path)
+                        .font(Typography.mono)
+                        .foregroundStyle(SeminarlyColors.textSecondary)
+                }
+                Text("Symlinks, not copies — the CLI tracks every app update. Uninstall removes them. Your shell PATH is never changed here; that stays a separate opt-in below.")
+                    .font(Typography.caption)
+                    .foregroundStyle(SeminarlyColors.textTertiary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, Spacing.xxs)
+            }
+        }
+        .font(Typography.caption)
+
+        // Isolated PATH opt-in — surfaced only once installed and only if needed.
+        if cliInstalled && !cliOnPath {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("`~/.local/bin` isn't on your PATH, so `seminarly-cli` won't resolve in a new shell yet.")
+                    .font(Typography.caption)
+                    .foregroundStyle(SeminarlyColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: Spacing.sm) {
+                    Button {
+                        addCLIToPath()
+                    } label: {
+                        Text("Add to PATH")
+                            .font(Typography.captionMedium)
+                            .foregroundStyle(SeminarlyColors.textPrimary)
+                            .padding(.horizontal, Spacing.sm)
+                            .padding(.vertical, Spacing.xxs)
+                            .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
+                    }
+                    .buttonStyle(.plain)
+
+                    Text("appends one line to ~/.zshrc")
+                        .font(Typography.caption)
+                        .foregroundStyle(SeminarlyColors.textTertiary)
+                }
+
+                Text(SeminarlyCLIInstaller.pathExportLine)
+                    .font(Typography.mono)
+                    .foregroundStyle(SeminarlyColors.textTertiary)
+                    .textSelection(.enabled)
+            }
+        }
+
+        if let cliError {
+            Text(cliError)
+                .font(Typography.caption)
+                .foregroundStyle(SeminarlyColors.destructive)
+                .fixedSize(horizontal: false, vertical: true)
+        } else if let cliStatus {
+            Text(cliStatus)
+                .font(Typography.caption)
+                .foregroundStyle(SeminarlyColors.success)
+        }
+    }
+
+    private func refreshCLIState() {
+        let installer = SeminarlyCLIInstaller.bundled
+        cliInstalled = installer.isInstalled
+        cliOnPath = installer.localBinOnPath
+        cliTouchedPaths = installer.touchedPaths
+    }
+
+    private func installCLI() {
+        do {
+            try SeminarlyCLIInstaller.bundled.install()
+            cliError = nil
+            cliStatus = "Installed — your coding agent can now read your sessions."
+        } catch {
+            cliStatus = nil
+            cliError = error.localizedDescription
+        }
+        refreshCLIState()
+        autoClearCLIStatus()
+    }
+
+    private func uninstallCLI() {
+        SeminarlyCLIInstaller.bundled.uninstall()
+        cliError = nil
+        cliStatus = "Uninstalled."
+        refreshCLIState()
+        autoClearCLIStatus()
+    }
+
+    private func addCLIToPath() {
+        do {
+            try SeminarlyCLIInstaller.bundled.addLocalBinToPath()
+            cliError = nil
+            cliStatus = "Added to PATH — restart your shell or run: source ~/.zshrc"
+        } catch {
+            cliStatus = nil
+            cliError = error.localizedDescription
+        }
+        refreshCLIState()
+        autoClearCLIStatus()
+    }
+
+    private func autoClearCLIStatus() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+            cliStatus = nil
         }
     }
 

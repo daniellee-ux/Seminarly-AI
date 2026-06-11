@@ -30,6 +30,14 @@ targets:
     platform: macOS
     sources:
       - Sources
+      # Embed the agent skill (SKILL.md) so it ships inside the app bundle at
+      # Contents/Resources/seminarly-cli/SKILL.md — the install helper symlinks
+      # this folder onto the user's PATH-adjacent skill dirs.
+      - path: .agents/skills/seminarly-cli/SKILL.md
+        buildPhase:
+          copyFiles:
+            destination: resources
+            subpath: seminarly-cli
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: ai.seminarly.Seminarly
@@ -46,6 +54,17 @@ targets:
     dependencies:
       - package: WhisperKit
       - package: FluidAudio
+      # Embed the self-contained CLI into Contents/Helpers/ and code-sign it on
+      # copy (Developer ID + hardened runtime during a notarized archive). It is
+      # built first as a target dependency; `link: false` because a command-line
+      # tool is copied, not linked into the app.
+      - target: seminarly-cli
+        link: false
+        embed: true
+        codeSign: true
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
     entitlements:
       path: Sources/Seminarly.entitlements
       properties:
@@ -73,7 +92,9 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: false
         GENERATE_INFOPLIST_FILE: true
-        SKIP_INSTALL: false
+        # Embedded into Seminarly.app (Contents/Helpers) rather than installed as
+        # a standalone product, so keep it out of the archive's install location.
+        SKIP_INSTALL: true
 
   SeminarlyTests:
     type: bundle.unit-test

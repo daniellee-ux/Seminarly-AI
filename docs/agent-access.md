@@ -39,6 +39,7 @@ The CLI uses the same `MeetingMarkdownRenderer` as the in-app Export → Markdow
 | `scripts/build-cli.sh` | Builds the binary and copies it into `Tools/`. |
 | `.agents/skills/seminarly-cli/SKILL.md` | Canonical Agent Skill (open standard format). |
 | `.claude/skills/seminarly-cli` | Symlink to the canonical location for tools that look here. |
+| `Sources/Utilities/SeminarlyCLIInstaller.swift` | Bundle-aware install/uninstall (symlinks the embedded binary + skill; isolated PATH opt-in). Drives the Settings section + empty-state offer. |
 
 ## Cross-tool skill discovery
 
@@ -73,6 +74,32 @@ The binary is excluded from version control via `.gitignore`. Contributors run t
 - Optionally appends `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` (skip with `--no-path-edit`).
 
 Flags: `--uninstall`, `--no-path-edit`, `--dry-run`. Idempotent; no `sudo`.
+
+## In-app install (for DMG users, no repo)
+
+`install-global.sh` is the **from-source** path: it symlinks the repo's `Tools/seminarly-cli`. A user who installs the notarized DMG has no repo, so the app does the equivalent itself.
+
+The app **bundles** the CLI and skill (see `project.yml`):
+
+- `Seminarly.app/Contents/Helpers/seminarly-cli` — the same self-contained binary, code-signed + notarized as part of the app (it links only system frameworks + the Swift runtime, so it runs identically outside the bundle).
+- `Seminarly.app/Contents/Resources/seminarly-cli/SKILL.md` — the embedded skill folder.
+
+`Sources/Utilities/SeminarlyCLIInstaller.swift` is the bundle-aware port of `install-global.sh`. Install **symlinks** (never copies) the bundled binary onto the user's PATH-adjacent dirs, so the CLI auto-tracks every app update and always matches the SwiftData schema it reads:
+
+- `~/.local/bin/seminarly-cli` → `…/Seminarly.app/Contents/Helpers/seminarly-cli`
+- `~/.agents/skills/seminarly-cli` → `…/Seminarly.app/Contents/Resources/seminarly-cli`
+- `~/.claude/skills/seminarly-cli` → `~/.agents/skills/seminarly-cli` (only if `~/.claude` exists)
+
+Install state is just **installed / not-installed** — "installed" means our `~/.local/bin` symlink exists and resolves into an app bundle. No version compare.
+
+**The PATH edit is kept separate.** Install only creates the clean, reversible symlinks; it never touches the shell. Adding `~/.local/bin` to `PATH` is a distinct opt-in surfaced only when needed (`addLocalBinToPath()` appends one idempotent line to `~/.zshrc`).
+
+Two UI surfaces drive it:
+
+- **Settings → Seminarly CLI and Skills** — the durable home: Install / Uninstall, a "what this touches" disclosure, and the isolated PATH opt-in.
+- **Empty-state offer** (`ContentView`, under *Start Recording*) — a quiet secondary button shown only when the CLI isn't installed **and** a coding-agent dir (`~/.claude`, `~/.codex`, `~/.cursor`, `~/.gemini`, `~/.agents`) exists. One click installs; it self-hides once installed.
+
+Logic is unit-tested in `Tests/SeminarlyCLIInstallerTests.swift` (injectable `home` / `fileManager` / `environment`).
 
 ## CLI surface
 
