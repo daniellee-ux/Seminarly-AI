@@ -71,6 +71,15 @@ final class UpdateChecker: ObservableObject {
         string: "https://api.github.com/repos/daniellee-ux/Seminarly-AI/releases/latest"
     )!
 
+    /// Direct-download link for the latest notarized DMG. GitHub's
+    /// `releases/latest/download/<asset>` redirects to the newest release's asset,
+    /// so clicking it downloads the build without landing on a GitHub page. Depends
+    /// on the release asset being named `Seminarly.dmg` (the packaging script's
+    /// fixed name); forks should point this at their own distribution.
+    nonisolated static let downloadURL = URL(
+        string: "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+    )!
+
     private init() {}
 
     /// The running build's marketing version (`CFBundleShortVersionString`).
@@ -102,9 +111,9 @@ final class UpdateChecker: ObservableObject {
         availableUpdate = nil
     }
 
-    func openDownloadPage(for release: GitHubRelease) {
-        guard let url = URL(string: release.htmlURL) else { return }
-        NSWorkspace.shared.open(url)
+    /// Open the direct download for the latest DMG (see `downloadURL`).
+    func openDownload() {
+        NSWorkspace.shared.open(Self.downloadURL)
     }
 
     // MARK: - Pure logic (nonisolated → unit-testable off the main actor)
@@ -230,7 +239,7 @@ final class UpdateChecker: ObservableObject {
         alert.addButton(withTitle: "Download")
         alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
-            openDownloadPage(for: release)
+            openDownload()
         }
     }
 

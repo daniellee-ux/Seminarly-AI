@@ -115,6 +115,17 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(UpdateChecker.shortReleaseNotes("- One change"), "- One change")
     }
 
+    // MARK: - Download URL
+
+    func testDownloadURLPointsAtLatestAsset() {
+        // The Download button relies on GitHub's latest-asset redirect; guard the
+        // exact string (the constant is force-unwrapped, so a typo crashes at launch).
+        XCTAssertEqual(
+            UpdateChecker.downloadURL.absoluteString,
+            "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+        )
+    }
+
     // MARK: - UpdateSettings.isDue (pure timing)
 
     func testIsDueWhenNeverChecked() {
