@@ -47,11 +47,12 @@ struct RecordingView: View {
     @State private var userNotesText = ""
     @State private var showTranscript = true
     @State private var timestampedNotes: [TimestampedNote] = []
-    // Lines already in the notepad when recording started — seeded into
-    // `timestampedNotes` at 0:00. Tracked so the live onLineCompleted callback
-    // doesn't re-timestamp one of them (a duplicate) if the user presses Enter
-    // after a pre-meeting note during recording.
-    @State private var seededSetupLines: Set<String> = []
+    // Remaining count, per line text, of setup lines seeded into
+    // `timestampedNotes` at 0:00 but not yet "completed" during recording. The
+    // live onLineCompleted callback decrements and skips a match so pressing
+    // Enter after a pre-meeting note doesn't log it twice — but a genuine later
+    // repeat of the same text (count exhausted) is still timestamped normally.
+    @State private var pendingSeededLines: [String: Int] = [:]
 
     // Post-recording lifecycle state (set after stopRecording saves the meeting)
     @State private var savedMeeting: Meeting?
@@ -195,9 +196,14 @@ struct RecordingView: View {
                 placeholderTitle: "Type notes as you listen...",
                 placeholderSubtitle: "Use # headings to define sections",
                 onLineCompleted: { lineText in
-                    // A setup line already seeded at 0:00 fires this when the user
-                    // presses Enter after it — skip it so it isn't logged twice.
-                    guard !seededSetupLines.contains(lineText) else { return }
+                    // If this line was seeded at 0:00 from the setup phase, the
+                    // user just pressed Enter after it — consume the seed instead
+                    // of logging a duplicate. A later verbatim repeat (seed count
+                    // exhausted) falls through and is timestamped normally.
+                    if let remaining = pendingSeededLines[lineText], remaining > 0 {
+                        pendingSeededLines[lineText] = remaining - 1
+                        return
+                    }
                     timestampedNotes.append(
                         TimestampedNote(timestamp: elapsedTime, text: lineText)
                     )
@@ -842,7 +848,7 @@ struct RecordingView: View {
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
-        seededSetupLines = Set(setupLines)
+        pendingSeededLines = setupLines.reduce(into: [:]) { $0[$1, default: 0] += 1 }
         timestampedNotes = setupLines.map { TimestampedNote(timestamp: 0, text: $0) }
 
         // Apply user-selected language
@@ -972,6 +978,16 @@ struct RecordingView: View {
                     timestampedNotes.append(TimestampedNote(timestamp: elapsedTime, text: lastLine))
                 }
             }
+
+            // 5b. Reconcile against the final notepad: drop any stamped note whose
+            // text the user edited or deleted after recording started (including
+            // stale 0:00 seeds). Enhancement and markdown export prefer
+            // timestampedNotes over the raw text, so a stamp must never contradict
+            // the notes the user actually kept.
+            let keptLines = Set(
+                userNotesText.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            )
+            timestampedNotes.removeAll { !keptLines.contains($0.text) }
 
             // 6. Save session
             let sessionTitle = "Session \(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short))"
