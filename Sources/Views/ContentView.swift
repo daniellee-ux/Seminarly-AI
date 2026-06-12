@@ -26,6 +26,7 @@ struct ContentView: View {
     @StateObject private var transcriptionEngine = TranscriptionEngine()
     @StateObject private var diarizationEngine = NeuralDiarizationEngine()
     @StateObject private var audioMonitor = AudioSourceMonitor()
+    @StateObject private var updateChecker = UpdateChecker.shared
 
     private var filteredMeetings: [Meeting] {
         if searchText.isEmpty { return meetings }
@@ -83,28 +84,40 @@ struct ContentView: View {
         } detail: {
             detail
                 .overlay(alignment: .top) {
-                    // Hide the banner while the user is viewing RecordingView — it
-                    // handles detections silently (auto-selects the source in its
-                    // dropdown) so a banner would be redundant and distracting.
-                    if !viewingRecording, let process = audioMonitor.detectedProcess {
-                        AudioDetectionBanner(
-                            process: process,
-                            onRecord: {
-                                preSelectedProcess = audioMonitor.accept()
-                                selectedMeeting = nil
-                                showingRecording = true
-                                viewingRecording = true
-                            },
-                            onDismiss: {
-                                audioMonitor.dismiss()
-                            }
-                        )
-                        .padding(.top, Spacing.sm)
-                        .padding(.horizontal, Spacing.xl)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                    // Banners are hidden while viewing RecordingView — it handles audio
+                    // detections silently, and an update notice shouldn't cover a live
+                    // recording. Stacked so both can appear at once.
+                    VStack(spacing: Spacing.xs) {
+                        if !viewingRecording, let process = audioMonitor.detectedProcess {
+                            AudioDetectionBanner(
+                                process: process,
+                                onRecord: {
+                                    preSelectedProcess = audioMonitor.accept()
+                                    selectedMeeting = nil
+                                    showingRecording = true
+                                    viewingRecording = true
+                                },
+                                onDismiss: {
+                                    audioMonitor.dismiss()
+                                }
+                            )
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+
+                        if !viewingRecording, let release = updateChecker.availableUpdate {
+                            UpdateBannerView(
+                                versionTitle: UpdateChecker.displayName(for: release),
+                                onDownload: { updateChecker.openDownloadPage(for: release) },
+                                onDismiss: { updateChecker.dismissBanner() }
+                            )
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                        }
                     }
+                    .padding(.top, Spacing.sm)
+                    .padding(.horizontal, Spacing.xl)
                 }
                 .animation(.easeInOut(duration: 0.3), value: audioMonitor.detectedProcess != nil)
+                .animation(.easeInOut(duration: 0.3), value: updateChecker.availableUpdate != nil)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         if appState.isRecording && !viewingRecording {
@@ -195,6 +208,13 @@ struct ContentView: View {
             await transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
             await diarizationEngine.prepareModels()
             audioMonitor.startMonitoring()
+        }
+        .task {
+            // Opt-in, default-off, throttled to once a day. A found update appears
+            // as the banner above; up-to-date / errors stay silent on this path.
+            if UpdateSettings.shared.isDueForAutomaticCheck() {
+                updateChecker.checkForUpdates(mode: .automatic)
+            }
         }
     }
 
