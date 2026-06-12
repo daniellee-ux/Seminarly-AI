@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var modelSaveStatus: String?
     @StateObject private var transcriptionSettings = TranscriptionSettings.shared
     @StateObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
+    @StateObject private var updateSettings = UpdateSettings.shared
     @AppStorage("autoDetectAudioSources") private var autoDetectEnabled = true
 
     /// Selection-only proxy: holds either a preset case, `.matchTranscript`, or
@@ -272,6 +273,30 @@ struct SettingsView: View {
 
                 Section("Seminarly CLI and Skills") {
                     cliAndSkillsSection
+                }
+
+                Section("Software Updates") {
+                    HStack {
+                        Button {
+                            UpdateChecker.shared.checkForUpdates(mode: .manual)
+                        } label: {
+                            Text("Check Now")
+                                .font(Typography.captionMedium)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, Spacing.sm)
+                                .padding(.vertical, Spacing.xxs)
+                                .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                        }
+                        .buttonStyle(.plain)
+
+                        Spacer()
+                    }
+
+                    Toggle("Automatically check for updates", isOn: $updateSettings.automaticallyCheckForUpdates)
+
+                    Text("Seminarly is local-first — your audio never leaves your Mac. Checking for updates is the one exception: it asks GitHub for the latest release version, sending no information about you. When enabled, Seminarly checks at most once a day and shows a dismissible banner if a newer version exists.")
+                        .font(Typography.caption)
+                        .foregroundStyle(SeminarlyColors.textSecondary)
                 }
 
                 Section("About") {

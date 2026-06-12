@@ -122,6 +122,15 @@ struct SeminarlyApp: App {
         }
         .defaultSize(width: 1000, height: 650)
         .modelContainer(modelContainer)
+        .commands {
+            // Sits right under "About Seminarly" in the app menu — the conventional
+            // spot for "Check for Updates…". Manual checks report every outcome.
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") {
+                    UpdateChecker.shared.checkForUpdates(mode: .manual)
+                }
+            }
+        }
 
         MenuBarExtra("Seminarly", systemImage: "waveform.circle.fill") {
             MenuBarView()

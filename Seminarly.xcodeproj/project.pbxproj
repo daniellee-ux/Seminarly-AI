@@ -16,10 +16,12 @@
 		0A486D6FC69BAB7431510694 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA68520F74553000BE94F18A /* KeychainStoreTests.swift */; };
 		138FDF555692413FC5D0AE68 /* AudioDetectionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */; };
 		176988E4F55C6A8E90D6C1AA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C186469B8F8014AFC557D7D /* ContentView.swift */; };
+		17919FC32DFF9621D5064971 /* UpdateCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05787983746741B60516ABED /* UpdateCheckerTests.swift */; };
 		1D413441C2EC2CD3375E3005 /* PathCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F10E3BAEBD75EA5F07B6D45 /* PathCommand.swift */; };
 		1E281C74DA35EC31B7D74B5A /* SearchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36EDF8A615F3BD8381DAB86 /* SearchCommand.swift */; };
 		2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC213A17EA411A454DCFB8F4 /* PromptTemplates.swift */; };
 		24CFA6FBB989237ACC3F2527 /* SpeakerEmbedding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D31F0D336330A248D7E9EF8 /* SpeakerEmbedding.swift */; };
+		264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */; };
 		26E009AD005BE831D60E27B9 /* ProcessTapManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */; };
 		26E4E5A7E3B2D3070D6B9A6E /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = F2AF1A0A68A664AA851E1EC5 /* WhisperKit */; };
 		2CE8C9C10E6672A11C0C63DD /* AudioBufferAccumulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0535A24CD213346912417B /* AudioBufferAccumulatorTests.swift */; };
@@ -32,6 +34,7 @@
 		3B5C4E07AE277FC6040CE168 /* SpeakerEmbedding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D31F0D336330A248D7E9EF8 /* SpeakerEmbedding.swift */; };
 		3D2FEFE3FC3680671520291A /* MeetingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BD96750494903A36134D6E /* MeetingModel.swift */; };
 		3F35DD165E15227BC2979789 /* DatabaseCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */; };
+		430D6B958C0A36A57821B258 /* SemanticVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D460CF4363C70841D56B72D9 /* SemanticVersion.swift */; };
 		45A19BA13654C5D30DDA98AC /* SummaryLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */; };
 		46177C81A0C684777B7808E3 /* ListCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E102078703CD4DAD162330 /* ListCommand.swift */; };
 		471872393F8D54858CA48CBA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220744F42A1788F0FE2D6AB4 /* SettingsView.swift */; };
@@ -51,6 +54,7 @@
 		729ACDF1C9CBF2B82FC8DB7C /* LLMResponseSanitizerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BDB4BD26226E2159D5AF74B7 /* LLMResponseSanitizerTests.swift */; };
 		72FFEE7E8492CA98E107424A /* SeminarlySchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 170D2276B45EE3998B383BA2 /* SeminarlySchemaV1.swift */; };
 		73226D2CB6CC054F3ED3E299 /* MeetingMarkdownRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E54F1906243B01FFCE252E00 /* MeetingMarkdownRendererTests.swift */; };
+		7398C3E07AB881BB789DF752 /* UpdateSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 708F89D50651B27D9BE23137 /* UpdateSettings.swift */; };
 		7508DA39BFFE7BC8286E059E /* OpenAICompatibleProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 627114C6B0F93E94EBD12D95 /* OpenAICompatibleProvider.swift */; };
 		75107660B627A4418E32030A /* TranscriptionLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB753678D31195EAAAF7EF95 /* TranscriptionLanguage.swift */; };
 		78CFC1DF1C463AF2546C3526 /* SessionFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1893FC5504CE291132F1E35C /* SessionFormatter.swift */; };
@@ -84,7 +88,9 @@
 		DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */; };
 		E90A53D5B14AAAF64AC05CB2 /* DatabaseCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */; };
 		EAACDE7F9E587D612B126BEF /* LLMProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442C1A5FDC026A3F72D52856 /* LLMProvider.swift */; };
+		EB318B50A689FE9778820349 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */; };
 		ECCB4A8391BF8A961103FE9F /* DatabaseErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */; };
+		F0AFACE2FE245FEDA50518DE /* UpdateBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D60962B7A4D96637E48113D /* UpdateBannerView.swift */; };
 		F1B6E3F395BD6AD1A30E5CFC /* MeetingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BD96750494903A36134D6E /* MeetingModel.swift */; };
 		F47FAEDEA65FB389F747480A /* SeminarlyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46E52AC557F7104AEB565D5 /* SeminarlyApp.swift */; };
 		F4BE19DE6E6463E692E9DFB8 /* MicrophoneCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */; };
@@ -140,6 +146,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		05787983746741B60516ABED /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
 		0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingMarkdownRenderer.swift; sourceTree = "<group>"; };
 		07C7E2C4EE048A8D9DFFE82D /* SeminarlyCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLI.swift; sourceTree = "<group>"; };
 		08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseErrorView.swift; sourceTree = "<group>"; };
@@ -161,19 +168,23 @@
 		2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptTemplatesLanguageTests.swift; sourceTree = "<group>"; };
 		3367B9D98B71D48FE8F168B9 /* MFCCExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFCCExtractorTests.swift; sourceTree = "<group>"; };
 		35150228257E97CD1838BB43 /* TranscriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptTests.swift; sourceTree = "<group>"; };
+		3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersionTests.swift; sourceTree = "<group>"; };
 		40110B8C8D1C4E853E42A998 /* Seminarly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Seminarly.entitlements; sourceTree = "<group>"; };
 		4373F8BD4EEDAE9A4E7B5D60 /* MarkdownListPrefixTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownListPrefixTests.swift; sourceTree = "<group>"; };
 		442C1A5FDC026A3F72D52856 /* LLMProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMProvider.swift; sourceTree = "<group>"; };
 		47E102078703CD4DAD162330 /* ListCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCommand.swift; sourceTree = "<group>"; };
+		4D60962B7A4D96637E48113D /* UpdateBannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateBannerView.swift; sourceTree = "<group>"; };
 		53D6105955D2E2D994F52B72 /* Seminarly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Seminarly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		540D080ABEAE8EB2DB0A4FFD /* AnthropicProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicProvider.swift; sourceTree = "<group>"; };
 		572D28B5EDFB24B724697891 /* SummaryLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguage.swift; sourceTree = "<group>"; };
 		582B18F272268549F5F54328 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		60EC4D05F182BD3B566B8B6A /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
 		627114C6B0F93E94EBD12D95 /* OpenAICompatibleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleProvider.swift; sourceTree = "<group>"; };
 		6C5EE274C41C3DBC014507E4 /* SummaryLanguageSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguageSettings.swift; sourceTree = "<group>"; };
 		6E6B0D4DED1E6ADE924CAF89 /* SeminarlyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeminarlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F10E3BAEBD75EA5F07B6D45 /* PathCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathCommand.swift; sourceTree = "<group>"; };
+		708F89D50651B27D9BE23137 /* UpdateSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettings.swift; sourceTree = "<group>"; };
 		723F4C91D76B4357C6B9ECAC /* LLMProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMProviderCatalog.swift; sourceTree = "<group>"; };
 		7A1ADE195415707A7D45D383 /* CodableModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableModelTests.swift; sourceTree = "<group>"; };
 		7DBC9152ACCA52E023313C17 /* MeetingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetailView.swift; sourceTree = "<group>"; };
@@ -205,6 +216,7 @@
 		C662AA5020C9B439FCD1EFDB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C76EB55618FE8289799D46EB /* MarkdownNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownNoteEditor.swift; sourceTree = "<group>"; };
 		D36EDF8A615F3BD8381DAB86 /* SearchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCommand.swift; sourceTree = "<group>"; };
+		D460CF4363C70841D56B72D9 /* SemanticVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersion.swift; sourceTree = "<group>"; };
 		D769202B0B31CAEBB6CDF131 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationEngineTests.swift; sourceTree = "<group>"; };
 		DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFormatterTests.swift; sourceTree = "<group>"; };
@@ -406,12 +418,14 @@
 				24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */,
 				2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */,
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
+				3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */,
 				9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */,
 				DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */,
 				11806D2BF8280456123BD8CF /* SpeakerClustererTests.swift */,
 				BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */,
 				874DB0735B5E685D1D7F5BB0 /* TranscriptionLanguageTests.swift */,
 				35150228257E97CD1838BB43 /* TranscriptTests.swift */,
+				05787983746741B60516ABED /* UpdateCheckerTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -429,6 +443,7 @@
 				F5668818DC5399A91AA48648 /* NotepadSurface.swift */,
 				960B5416B0953F3EF88B3BAB /* RecordingView.swift */,
 				220744F42A1788F0FE2D6AB4 /* SettingsView.swift */,
+				4D60962B7A4D96637E48113D /* UpdateBannerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -436,7 +451,10 @@
 		EF8057A8371C0E25BAB39E92 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				D460CF4363C70841D56B72D9 /* SemanticVersion.swift */,
 				AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */,
+				588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */,
+				708F89D50651B27D9BE23137 /* UpdateSettings.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -592,12 +610,14 @@
 				5CAB6C3A7C986808A29C93EA /* NoteTemplateTests.swift in Sources */,
 				9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */,
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
+				264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */,
 				09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */,
 				3086DF2F96EE20D942903C43 /* SessionFormatterTests.swift in Sources */,
 				71BBC281CAFAAB465CFFD11D /* SpeakerClustererTests.swift in Sources */,
 				45A19BA13654C5D30DDA98AC /* SummaryLanguageTests.swift in Sources */,
 				7F6ECAB295412F8B8FBE15A3 /* TranscriptTests.swift in Sources */,
 				F7078EF2EDACDA50E4D663BC /* TranscriptionLanguageTests.swift in Sources */,
+				17919FC32DFF9621D5064971 /* UpdateCheckerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -658,6 +678,7 @@
 				26E009AD005BE831D60E27B9 /* ProcessTapManager.swift in Sources */,
 				2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */,
 				CBD75ED7F232B718B51816A1 /* RecordingView.swift in Sources */,
+				430D6B958C0A36A57821B258 /* SemanticVersion.swift in Sources */,
 				F47FAEDEA65FB389F747480A /* SeminarlyApp.swift in Sources */,
 				FE398F3C3860F62E4DDCED9D /* SeminarlyCLIInstaller.swift in Sources */,
 				72FFEE7E8492CA98E107424A /* SeminarlySchemaV1.swift in Sources */,
@@ -672,6 +693,9 @@
 				B490BDB123CAC48F2DDB3854 /* TranscriptionEngine.swift in Sources */,
 				75107660B627A4418E32030A /* TranscriptionLanguage.swift in Sources */,
 				061D063341CCF1B8B0BD3DBC /* TranscriptionSettings.swift in Sources */,
+				F0AFACE2FE245FEDA50518DE /* UpdateBannerView.swift in Sources */,
+				EB318B50A689FE9778820349 /* UpdateChecker.swift in Sources */,
+				7398C3E07AB881BB789DF752 /* UpdateSettings.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -831,14 +855,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
@@ -854,14 +878,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.1;
+				MARKETING_VERSION = 0.1.2;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
