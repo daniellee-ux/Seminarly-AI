@@ -235,6 +235,146 @@ final class MeetingModelTests: XCTestCase {
         XCTAssertNil(meeting.timestampedNotesData)
     }
 
+    // MARK: - TimestampedNote.reconcile
+
+    func testReconcilePreservesMultiLineSetupNotesAtZero() {
+        // The reported bug: an agenda typed before recording must survive and
+        // stay anchored at 0:00 (all lines seeded, nothing typed while recording).
+        let seeded = [
+            TimestampedNote(timestamp: 0, text: "Q3 roadmap"),
+            TimestampedNote(timestamp: 0, text: "Budget"),
+            TimestampedNote(timestamp: 0, text: "Hiring"),
+        ]
+        let result = TimestampedNote.reconcile(
+            notepadText: "Q3 roadmap\nBudget\nHiring",
+            log: seeded,
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, seeded)
+    }
+
+    func testReconcileSingleSetupLineWithoutNewlineStaysAtZero() {
+        // Common case: one agenda line, no trailing newline, never completed
+        // during recording. It must anchor at 0:00, not the end-of-recording time.
+        let result = TimestampedNote.reconcile(
+            notepadText: "Ask about budget",
+            log: [TimestampedNote(timestamp: 0, text: "Ask about budget")],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [TimestampedNote(timestamp: 0, text: "Ask about budget")])
+    }
+
+    func testReconcileSeedWinsOverLaterCompletion() {
+        // Pressing Enter after a seeded setup line logs it again mid-session;
+        // the earliest (0:00) stamp must win.
+        let result = TimestampedNote.reconcile(
+            notepadText: "Agenda",
+            log: [
+                TimestampedNote(timestamp: 0, text: "Agenda"),
+                TimestampedNote(timestamp: 120, text: "Agenda"),
+            ],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [TimestampedNote(timestamp: 0, text: "Agenda")])
+    }
+
+    func testReconcileTrailingUntimestampedLineUsesTrailingTime() {
+        // A line still being typed at stop (never completed) takes the final
+        // elapsed time; earlier completed lines keep their own stamps.
+        let result = TimestampedNote.reconcile(
+            notepadText: "first\nsecond",
+            log: [TimestampedNote(timestamp: 12, text: "first")],
+            trailingTimestamp: 300
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 12, text: "first"),
+            TimestampedNote(timestamp: 300, text: "second"),
+        ])
+    }
+
+    func testReconcileCompletedLastLineWithTrailingNewlineDefaultsToZero() {
+        // The buffer ends with a newline, so the last note was completed (Enter
+        // pressed), not still open — even though it was edited after completion
+        // and no longer matches the log. It must default to 0:00, not stop time.
+        let result = TimestampedNote.reconcile(
+            notepadText: "first\nsecond edited\n",
+            log: [
+                TimestampedNote(timestamp: 10, text: "first"),
+                TimestampedNote(timestamp: 20, text: "second"),
+            ],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 10, text: "first"),
+            TimestampedNote(timestamp: 0, text: "second edited"),
+        ])
+    }
+
+    func testReconcileTrailingWhitespaceLineIsTreatedAsCompleted() {
+        // A blank/whitespace-only last physical line also means the last note was
+        // completed, so it defaults to 0:00 rather than stop time.
+        let result = TimestampedNote.reconcile(
+            notepadText: "first\nsecond\n   ",
+            log: [TimestampedNote(timestamp: 10, text: "first")],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 10, text: "first"),
+            TimestampedNote(timestamp: 0, text: "second"),
+        ])
+    }
+
+    func testReconcileDropsEditedAndDeletedLinesButKeepsCurrentText() {
+        // Editing a non-final line mid-session keeps the *new* text (not the stale
+        // stamp) without dropping it; a deleted line vanishes entirely.
+        let result = TimestampedNote.reconcile(
+            notepadText: "alpha edited\ngamma",
+            log: [
+                TimestampedNote(timestamp: 10, text: "alpha"),
+                TimestampedNote(timestamp: 20, text: "beta"),
+            ],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 0, text: "alpha edited"),
+            TimestampedNote(timestamp: 600, text: "gamma"),
+        ])
+    }
+
+    func testReconcileKeepsBothOccurrencesOfADuplicatedLine() {
+        // A setup line repeated verbatim as a live note must appear twice, each
+        // consuming a distinct stamp (earliest first).
+        let result = TimestampedNote.reconcile(
+            notepadText: "agenda\nagenda",
+            log: [
+                TimestampedNote(timestamp: 0, text: "agenda"),
+                TimestampedNote(timestamp: 45, text: "agenda"),
+            ],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 0, text: "agenda"),
+            TimestampedNote(timestamp: 45, text: "agenda"),
+        ])
+    }
+
+    func testReconcileTrimsWhitespaceAndSkipsBlankLines() {
+        let result = TimestampedNote.reconcile(
+            notepadText: "  alpha  \n\n  beta  ",
+            log: [],
+            trailingTimestamp: 300
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 0, text: "alpha"),
+            TimestampedNote(timestamp: 300, text: "beta"),
+        ])
+    }
+
+    func testReconcileEmptyNotepadReturnsEmpty() {
+        XCTAssertTrue(TimestampedNote.reconcile(notepadText: "", log: [], trailingTimestamp: 600).isEmpty)
+        XCTAssertTrue(TimestampedNote.reconcile(notepadText: "   \n  ", log: [], trailingTimestamp: 600).isEmpty)
+    }
+
     // MARK: - Session typealias
 
     func testSessionTypealiasExists() {

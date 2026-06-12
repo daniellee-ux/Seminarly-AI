@@ -203,6 +203,58 @@ struct TimestampedNote: Codable, Hashable, Sendable {
     static func formatForPrompt(_ notes: [TimestampedNote]) -> String {
         notes.map { "[\($0.formattedTimestamp)] \($0.text)" }.joined(separator: "\n")
     }
+
+    /// Rebuilds a timestamped-notes list so it faithfully mirrors `notepadText`,
+    /// the authoritative note content the user kept.
+    ///
+    /// The live `log` accumulated during recording (setup lines seeded at 0:00
+    /// plus lines completed mid-session) can drift from the notepad as the user
+    /// edits, deletes, or duplicates lines. This reconciles all of that in one
+    /// pass so downstream consumers — which prefer timestamped notes over the raw
+    /// text — never see a stamp that contradicts what the user kept:
+    /// - each non-empty notepad line, in order, takes its *earliest* matching
+    ///   stamp from the log (so a 0:00 setup seed wins over a later Enter on the
+    ///   same text, and repeated lines each consume a distinct stamp);
+    /// - a line with no matching stamp defaults to 0:00, except a still-open
+    ///   trailing line — one the user was actively typing and had not yet
+    ///   completed with Enter — which is treated as written at `trailingTimestamp`
+    ///   (the elapsed time when recording stopped);
+    /// - lines edited or deleted out of the notepad simply never appear.
+    static func reconcile(
+        notepadText: String,
+        log: [TimestampedNote],
+        trailingTimestamp: Double
+    ) -> [TimestampedNote] {
+        var stampsByText: [String: [Double]] = [:]
+        for note in log {
+            stampsByText[note.text, default: []].append(note.timestamp)
+        }
+        for key in stampsByText.keys { stampsByText[key]?.sort() }
+
+        // The final line is still being typed (not yet completed with Enter) only
+        // when the raw text's last physical line holds content. A trailing newline
+        // — or a blank/whitespace last line — means it was already completed, so it
+        // defaults to 0:00 like any other unmatched line rather than to stop time.
+        let lastPhysicalLineIsOpen = !(notepadText
+            .components(separatedBy: "\n")
+            .last?
+            .trimmingCharacters(in: .whitespaces)
+            .isEmpty ?? true)
+
+        let lines = notepadText
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return lines.enumerated().map { index, line in
+            if var stamps = stampsByText[line], !stamps.isEmpty {
+                let earliest = stamps.removeFirst()
+                stampsByText[line] = stamps
+                return TimestampedNote(timestamp: earliest, text: line)
+            }
+            let isOpenTrailingLine = lastPhysicalLineIsOpen && index == lines.count - 1
+            return TimestampedNote(timestamp: isOpenTrailingLine ? trailingTimestamp : 0, text: line)
+        }
+    }
 }
 
 @Model

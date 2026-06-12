@@ -46,6 +46,9 @@ struct RecordingView: View {
     // Notepad state
     @State private var userNotesText = ""
     @State private var showTranscript = true
+    // Live, append-only log of notes completed during recording. It can drift
+    // from the editable notepad as the user edits/deletes lines, so it is
+    // rebuilt from the final notepad text in stopRecording() before saving.
     @State private var timestampedNotes: [TimestampedNote] = []
 
     // Post-recording lifecycle state (set after stopRecording saves the meeting)
@@ -190,6 +193,8 @@ struct RecordingView: View {
                 placeholderTitle: "Type notes as you listen...",
                 placeholderSubtitle: "Use # headings to define sections",
                 onLineCompleted: { lineText in
+                    // Append freely — any duplicate of a seeded setup line is
+                    // reconciled when stopRecording() rebuilds from the notepad.
                     timestampedNotes.append(
                         TimestampedNote(timestamp: elapsedTime, text: lineText)
                     )
@@ -820,8 +825,18 @@ struct RecordingView: View {
 
     private func startRecording() {
         transcriptionEngine.reset()
-        userNotesText = ""
-        timestampedNotes = []
+
+        // Preserve any notes the user jotted down during the setup phase rather
+        // than wiping them, and seed each non-empty line as a 0:00 entry. This
+        // anchors pre-meeting notes at the start of the timeline: stopRecording()
+        // rebuilds timestampedNotes from the final notepad and keeps each line's
+        // earliest stamp, so a seeded setup line stays at 0:00 even if the user
+        // later presses Enter after it (which would otherwise stamp it mid-session).
+        let setupLines = userNotesText
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        timestampedNotes = setupLines.map { TimestampedNote(timestamp: 0, text: $0) }
 
         // Apply user-selected language
         transcriptionEngine.selectedLanguage = selectedLanguage.whisperCode
@@ -940,16 +955,17 @@ struct RecordingView: View {
             )
             logger.info("Transcript created. rawText length: \(transcript.rawText.count), segments: \(transcript.segments.count)")
 
-            // 5. Capture any remaining untimestamped last line
+            // 5. Rebuild timestampedNotes from the final notepad so it faithfully
+            // mirrors the notes the user actually kept (see TimestampedNote.reconcile).
+            // Enhancement and markdown export prefer it over the raw text, so it
+            // must contain every kept line and nothing stale, even after the user
+            // edits, deletes, or duplicates lines mid-session.
             let trimmedNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmedNotes.isEmpty {
-                let lines = userNotesText.components(separatedBy: "\n")
-                if let lastLine = lines.last?.trimmingCharacters(in: .whitespaces),
-                   !lastLine.isEmpty,
-                   !timestampedNotes.contains(where: { $0.text == lastLine }) {
-                    timestampedNotes.append(TimestampedNote(timestamp: elapsedTime, text: lastLine))
-                }
-            }
+            timestampedNotes = TimestampedNote.reconcile(
+                notepadText: userNotesText,
+                log: timestampedNotes,
+                trailingTimestamp: elapsedTime
+            )
 
             // 6. Save session
             let sessionTitle = "Session \(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short))"
