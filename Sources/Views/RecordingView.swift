@@ -820,8 +820,21 @@ struct RecordingView: View {
 
     private func startRecording() {
         transcriptionEngine.reset()
-        userNotesText = ""
-        timestampedNotes = []
+
+        // Preserve any notes the user jotted down during the setup phase rather
+        // than wiping them. Seed the already-completed lines (everything but the
+        // still-active last line) as timestamped-at-zero entries so the notepad
+        // text and the timestamped notes that drive enhancement and markdown
+        // rendering stay in sync — both prefer `timestampedNotes` when present,
+        // so leaving setup lines out would silently drop them from the AI prompt.
+        // The last line is left untouched: onLineCompleted timestamps it once the
+        // user presses Enter during recording, and stopRecording() captures it
+        // otherwise — seeding it here too would double-count it.
+        let setupLines = userNotesText.components(separatedBy: "\n")
+        timestampedNotes = setupLines.dropLast().compactMap { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return trimmed.isEmpty ? nil : TimestampedNote(timestamp: 0, text: trimmed)
+        }
 
         // Apply user-selected language
         transcriptionEngine.selectedLanguage = selectedLanguage.whisperCode
