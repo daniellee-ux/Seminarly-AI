@@ -533,7 +533,6 @@ struct MarkdownNoteEditor: NSViewRepresentable {
             guard selected.location + selected.length <= fullText.length else { return false }
 
             let indentUnit = "  "
-            let indentLen = (indentUnit as NSString).length
 
             // Branch A: single cursor — only act on list lines
             if selected.length == 0 {

@@ -13,12 +13,12 @@ final class DiarizationEngine: ObservableObject {
     @Published var errorMessage: String?
 
     /// Window duration in seconds for speaker analysis.
-    nonisolated(unsafe) static let windowDuration: Double = 3.0
+    nonisolated static let windowDuration: Double = 3.0
     /// Hop between windows (50% overlap).
-    nonisolated(unsafe) static let windowHop: Double = 1.5
+    nonisolated static let windowHop: Double = 1.5
     /// Minimum window energy to consider voiced (RMS threshold).
     /// Normal speech RMS is ~0.03-0.3; this filters out noise/breath.
-    nonisolated(unsafe) static let voiceEnergyThreshold: Float = 0.02
+    nonisolated static let voiceEnergyThreshold: Float = 0.02
 
     /// Apply speaker labels to transcript segments using windowed MFCC+pitch embeddings
     /// and batch agglomerative clustering. Heavy computation runs on a background thread.
