@@ -100,10 +100,15 @@ enum CoreAudioUtils {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var bundleID: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        // Core Audio returns the CFString following the Create Rule (caller owns a
+        // +1). Receive it as an Unmanaged so ownership is explicit; takeRetainedValue
+        // consumes that +1. Passing &CFString directly is flagged as unsafe because
+        // forming a raw pointer to an ARC-managed reference is undefined.
+        var bundleID: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let err = AudioObjectGetPropertyData(objectID, &address, 0, nil, &size, &bundleID)
-        return err == noErr ? (bundleID as String) : nil
+        guard err == noErr, let bundleID else { return nil }
+        return bundleID.takeRetainedValue() as String
     }
 
     static func translatePIDToProcessObject(pid: pid_t) -> AudioObjectID? {
@@ -181,12 +186,17 @@ enum CoreAudioUtils {
             mScope: kAudioObjectPropertyScopeGlobal,
             mElement: kAudioObjectPropertyElementMain
         )
-        var uid: CFString = "" as CFString
-        var size = UInt32(MemoryLayout<CFString>.size)
+        // Received as Unmanaged (Create Rule, +1) rather than &CFString — see
+        // getProcessBundleID. takeRetainedValue consumes the +1.
+        var uid: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         let err = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &uid)
         guard err == noErr else {
             throw CoreAudioError.osStatus(err, "getDeviceUID")
         }
-        return uid as String
+        guard let uid else {
+            throw CoreAudioError.noData("getDeviceUID")
+        }
+        return uid.takeRetainedValue() as String
     }
 }
