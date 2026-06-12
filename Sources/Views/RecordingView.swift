@@ -47,6 +47,11 @@ struct RecordingView: View {
     @State private var userNotesText = ""
     @State private var showTranscript = true
     @State private var timestampedNotes: [TimestampedNote] = []
+    // Lines already in the notepad when recording started — seeded into
+    // `timestampedNotes` at 0:00. Tracked so the live onLineCompleted callback
+    // doesn't re-timestamp one of them (a duplicate) if the user presses Enter
+    // after a pre-meeting note during recording.
+    @State private var seededSetupLines: Set<String> = []
 
     // Post-recording lifecycle state (set after stopRecording saves the meeting)
     @State private var savedMeeting: Meeting?
@@ -190,6 +195,9 @@ struct RecordingView: View {
                 placeholderTitle: "Type notes as you listen...",
                 placeholderSubtitle: "Use # headings to define sections",
                 onLineCompleted: { lineText in
+                    // A setup line already seeded at 0:00 fires this when the user
+                    // presses Enter after it — skip it so it isn't logged twice.
+                    guard !seededSetupLines.contains(lineText) else { return }
                     timestampedNotes.append(
                         TimestampedNote(timestamp: elapsedTime, text: lineText)
                     )
@@ -822,19 +830,20 @@ struct RecordingView: View {
         transcriptionEngine.reset()
 
         // Preserve any notes the user jotted down during the setup phase rather
-        // than wiping them. Seed the already-completed lines (everything but the
-        // still-active last line) as timestamped-at-zero entries so the notepad
-        // text and the timestamped notes that drive enhancement and markdown
-        // rendering stay in sync — both prefer `timestampedNotes` when present,
-        // so leaving setup lines out would silently drop them from the AI prompt.
-        // The last line is left untouched: onLineCompleted timestamps it once the
-        // user presses Enter during recording, and stopRecording() captures it
-        // otherwise — seeding it here too would double-count it.
-        let setupLines = userNotesText.components(separatedBy: "\n")
-        timestampedNotes = setupLines.dropLast().compactMap { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            return trimmed.isEmpty ? nil : TimestampedNote(timestamp: 0, text: trimmed)
-        }
+        // than wiping them, and seed every non-empty line as a timestamped-at-zero
+        // entry. Both the AI enhancement prompt (runEnhancement) and
+        // MeetingMarkdownRenderer prefer `timestampedNotes` over the raw text when
+        // it is non-empty, so the two must stay in sync or setup notes would be
+        // silently dropped from the prompt and exports. Seeding *all* lines —
+        // including the last, which usually has no trailing newline — anchors a
+        // pre-meeting note at 0:00 instead of letting stopRecording()'s trailing-
+        // line capture mis-stamp it with the end-of-recording time.
+        let setupLines = userNotesText
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        seededSetupLines = Set(setupLines)
+        timestampedNotes = setupLines.map { TimestampedNote(timestamp: 0, text: $0) }
 
         // Apply user-selected language
         transcriptionEngine.selectedLanguage = selectedLanguage.whisperCode
