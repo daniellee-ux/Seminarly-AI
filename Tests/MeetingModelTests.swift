@@ -292,6 +292,38 @@ final class MeetingModelTests: XCTestCase {
         ])
     }
 
+    func testReconcileCompletedLastLineWithTrailingNewlineDefaultsToZero() {
+        // The buffer ends with a newline, so the last note was completed (Enter
+        // pressed), not still open — even though it was edited after completion
+        // and no longer matches the log. It must default to 0:00, not stop time.
+        let result = TimestampedNote.reconcile(
+            notepadText: "first\nsecond edited\n",
+            log: [
+                TimestampedNote(timestamp: 10, text: "first"),
+                TimestampedNote(timestamp: 20, text: "second"),
+            ],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 10, text: "first"),
+            TimestampedNote(timestamp: 0, text: "second edited"),
+        ])
+    }
+
+    func testReconcileTrailingWhitespaceLineIsTreatedAsCompleted() {
+        // A blank/whitespace-only last physical line also means the last note was
+        // completed, so it defaults to 0:00 rather than stop time.
+        let result = TimestampedNote.reconcile(
+            notepadText: "first\nsecond\n   ",
+            log: [TimestampedNote(timestamp: 10, text: "first")],
+            trailingTimestamp: 600
+        )
+        XCTAssertEqual(result, [
+            TimestampedNote(timestamp: 10, text: "first"),
+            TimestampedNote(timestamp: 0, text: "second"),
+        ])
+    }
+
     func testReconcileDropsEditedAndDeletedLinesButKeepsCurrentText() {
         // Editing a non-final line mid-session keeps the *new* text (not the stale
         // stamp) without dropping it; a deleted line vanishes entirely.

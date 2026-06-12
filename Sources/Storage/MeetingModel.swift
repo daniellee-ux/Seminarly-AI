@@ -216,8 +216,9 @@ struct TimestampedNote: Codable, Hashable, Sendable {
     ///   stamp from the log (so a 0:00 setup seed wins over a later Enter on the
     ///   same text, and repeated lines each consume a distinct stamp);
     /// - a line with no matching stamp defaults to 0:00, except a still-open
-    ///   trailing line, which is treated as written at `trailingTimestamp` (the
-    ///   elapsed time when recording stopped);
+    ///   trailing line — one the user was actively typing and had not yet
+    ///   completed with Enter — which is treated as written at `trailingTimestamp`
+    ///   (the elapsed time when recording stopped);
     /// - lines edited or deleted out of the notepad simply never appear.
     static func reconcile(
         notepadText: String,
@@ -230,6 +231,16 @@ struct TimestampedNote: Codable, Hashable, Sendable {
         }
         for key in stampsByText.keys { stampsByText[key]?.sort() }
 
+        // The final line is still being typed (not yet completed with Enter) only
+        // when the raw text's last physical line holds content. A trailing newline
+        // — or a blank/whitespace last line — means it was already completed, so it
+        // defaults to 0:00 like any other unmatched line rather than to stop time.
+        let lastPhysicalLineIsOpen = !(notepadText
+            .components(separatedBy: "\n")
+            .last?
+            .trimmingCharacters(in: .whitespaces)
+            .isEmpty ?? true)
+
         let lines = notepadText
             .components(separatedBy: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -240,8 +251,8 @@ struct TimestampedNote: Codable, Hashable, Sendable {
                 stampsByText[line] = stamps
                 return TimestampedNote(timestamp: earliest, text: line)
             }
-            let isTrailing = index == lines.count - 1
-            return TimestampedNote(timestamp: isTrailing ? trailingTimestamp : 0, text: line)
+            let isOpenTrailingLine = lastPhysicalLineIsOpen && index == lines.count - 1
+            return TimestampedNote(timestamp: isOpenTrailingLine ? trailingTimestamp : 0, text: line)
         }
     }
 }
