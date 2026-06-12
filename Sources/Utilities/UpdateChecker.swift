@@ -71,6 +71,15 @@ final class UpdateChecker: ObservableObject {
         string: "https://api.github.com/repos/daniellee-ux/Seminarly-AI/releases/latest"
     )!
 
+    /// Direct-download link for the latest notarized DMG. GitHub's
+    /// `releases/latest/download/<asset>` redirects to the newest release's asset,
+    /// so clicking it downloads the build without landing on a GitHub page. Depends
+    /// on the release asset being named `Seminarly.dmg` (the packaging script's
+    /// fixed name); forks should point this at their own distribution.
+    nonisolated static let downloadURL = URL(
+        string: "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+    )!
+
     private init() {}
 
     /// The running build's marketing version (`CFBundleShortVersionString`).
@@ -102,9 +111,9 @@ final class UpdateChecker: ObservableObject {
         availableUpdate = nil
     }
 
-    func openDownloadPage(for release: GitHubRelease) {
-        guard let url = URL(string: release.htmlURL) else { return }
-        NSWorkspace.shared.open(url)
+    /// Open the direct download for the latest DMG (see `downloadURL`).
+    func openDownload() {
+        NSWorkspace.shared.open(Self.downloadURL)
     }
 
     // MARK: - Pure logic (nonisolated → unit-testable off the main actor)
@@ -126,27 +135,128 @@ final class UpdateChecker: ObservableObject {
             : .upToDate(current: current)
     }
 
-    /// Trim release-note markdown to a few lines for an alert; nil if empty.
-    nonisolated static func shortReleaseNotes(
-        _ body: String?,
-        maxLines: Int = 8,
-        maxCharacters: Int = 600
-    ) -> String? {
-        guard let trimmed = body?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !trimmed.isEmpty else { return nil }
+    /// Extract the user-facing "what's new" from a GitHub release body: drop the
+    /// duplicate title line and everything from the first boilerplate boundary
+    /// (install steps, requirements, changelog link, or a `---` rule). Markdown is
+    /// preserved for rendering. Returns nil if empty. Pure → unit-tested.
+    nonisolated static func releaseNotesSummary(_ body: String?) -> String? {
+        guard let raw = body?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else { return nil }
 
-        var lines = trimmed.components(separatedBy: .newlines)
-        var didTruncate = false
-        if lines.count > maxLines {
-            lines = Array(lines.prefix(maxLines))
-            didTruncate = true
+        var kept: [String] = []
+        for original in raw.components(separatedBy: .newlines) {
+            let line = original.trimmingCharacters(in: .whitespaces)
+            if isBoilerplateBoundary(line) { break }
+            if kept.isEmpty && isTitleLine(line) { continue }   // drop leading title
+            kept.append(line)
         }
-        var text = lines.joined(separator: "\n")
-        if text.count > maxCharacters {
-            text = String(text.prefix(maxCharacters)).trimmingCharacters(in: .whitespacesAndNewlines)
-            didTruncate = true
+
+        while kept.first?.isEmpty == true { kept.removeFirst() }
+        while kept.last?.isEmpty == true { kept.removeLast() }
+        var collapsed: [String] = []
+        for line in kept where !(line.isEmpty && collapsed.last?.isEmpty == true) {
+            collapsed.append(line)
         }
-        return didTruncate ? text + "\n…" : text
+        let result = collapsed.joined(separator: "\n")
+        return result.isEmpty ? nil : result
+    }
+
+    /// A section header that starts release-notes boilerplate, or a horizontal rule.
+    nonisolated private static func isBoilerplateBoundary(_ line: String) -> Bool {
+        if line == "---" || line == "***" || line == "___" { return true }
+        let label = line.trimmingCharacters(in: CharacterSet(charactersIn: "#*_ ")).lowercased()
+        return ["updating", "installing", "install", "requires", "full changelog", "changelog"]
+            .contains { label.hasPrefix($0) }
+    }
+
+    /// The leading "**Seminarly vX** — …" / "# Seminarly X" line — it duplicates the
+    /// alert's headline, so it's dropped.
+    nonisolated private static func isTitleLine(_ line: String) -> Bool {
+        (line.hasPrefix("#") || line.hasPrefix("**")) && line.lowercased().contains("seminarly")
+    }
+
+    /// Render the extracted "what's new" into a styled attributed string for the
+    /// update alert's accessory — headings emphasized, `-`/`*` items as bullets, and
+    /// inline `**bold**` / `*italic*` / `` `code` `` applied (no raw markdown shown).
+    nonisolated static func renderedReleaseNotes(_ body: String?) -> NSAttributedString? {
+        guard let summary = releaseNotesSummary(body) else { return nil }
+
+        let baseSize = NSFont.systemFontSize(for: .small)
+        let baseFont = NSFont.systemFont(ofSize: baseSize)
+        let headingFont = NSFont.systemFont(ofSize: baseSize + 1, weight: .semibold)
+
+        let bulletStyle = NSMutableParagraphStyle()
+        bulletStyle.headIndent = 14
+        bulletStyle.paragraphSpacing = 2
+
+        let out = NSMutableAttributedString()
+        for (index, line) in summary.components(separatedBy: .newlines).enumerated() {
+            if index > 0 { out.append(NSAttributedString(string: "\n")) }
+            if line.isEmpty { continue }
+
+            if line.hasPrefix("#") {
+                let text = String(line.drop(while: { $0 == "#" })).trimmingCharacters(in: .whitespaces)
+                appendInline(text, font: headingFont, paragraph: nil, into: out)
+            } else if let item = bulletBody(line) {
+                out.append(NSAttributedString(string: "•  ", attributes: [
+                    .font: baseFont, .foregroundColor: NSColor.labelColor, .paragraphStyle: bulletStyle,
+                ]))
+                appendInline(item, font: baseFont, paragraph: bulletStyle, into: out)
+            } else {
+                appendInline(line, font: baseFont, paragraph: nil, into: out)
+            }
+        }
+        return out
+    }
+
+    nonisolated private static func bulletBody(_ line: String) -> String? {
+        for marker in ["- ", "* ", "+ "] where line.hasPrefix(marker) {
+            return String(line.dropFirst(marker.count))
+        }
+        return nil
+    }
+
+    /// Append `text`, applying inline `**bold**` / `*italic*` / `` `code` `` runs.
+    nonisolated private static func appendInline(
+        _ text: String, font: NSFont, paragraph: NSParagraphStyle?, into out: NSMutableAttributedString
+    ) {
+        var bold = false, italic = false, code = false
+        var buffer = ""
+
+        func flush() {
+            guard !buffer.isEmpty else { return }
+            var styled = font
+            if code {
+                styled = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .regular)
+            } else {
+                var traits: NSFontDescriptor.SymbolicTraits = []
+                if bold { traits.insert(.bold) }
+                if italic { traits.insert(.italic) }
+                if !traits.isEmpty {
+                    styled = NSFont(descriptor: font.fontDescriptor.withSymbolicTraits(traits),
+                                    size: font.pointSize) ?? font
+                }
+            }
+            var attrs: [NSAttributedString.Key: Any] = [.font: styled, .foregroundColor: NSColor.labelColor]
+            if let paragraph { attrs[.paragraphStyle] = paragraph }
+            out.append(NSAttributedString(string: buffer, attributes: attrs))
+            buffer = ""
+        }
+
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            if chars[i] == "*" && i + 1 < chars.count && chars[i + 1] == "*" {
+                flush(); bold.toggle(); i += 2
+            } else if chars[i] == "*" {
+                flush(); italic.toggle(); i += 1
+            } else if chars[i] == "`" {
+                flush(); code.toggle(); i += 1
+            } else {
+                buffer.append(chars[i]); i += 1
+            }
+        }
+        flush()
     }
 
     /// Display name for a release: its title if present, else "Version X.Y.Z".
@@ -223,15 +333,50 @@ final class UpdateChecker: ObservableObject {
         let alert = NSAlert()
         alert.messageText = "Update Available"
         var info = "\(Self.displayName(for: release)) is available — you're on \(Self.currentVersionString)."
-        if let notes = Self.shortReleaseNotes(release.body) {
-            info += "\n\nWhat's new:\n\(notes)"
+        // Render the notes into a scrollable accessory so nothing is trimmed and the
+        // markdown shows formatted rather than as raw syntax.
+        if let notes = Self.renderedReleaseNotes(release.body) {
+            info += "\n\nWhat's new:"
+            alert.accessoryView = makeNotesAccessory(notes)
         }
         alert.informativeText = info
         alert.addButton(withTitle: "Download")
         alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
-            openDownloadPage(for: release)
+            openDownload()
         }
+    }
+
+    /// A bordered, scrollable, read-only text view for the alert's release notes.
+    /// Sized to content up to a cap, then scrolls — so long notes are never trimmed.
+    private func makeNotesAccessory(_ notes: NSAttributedString) -> NSScrollView {
+        let width: CGFloat = 360
+        let textHeight = notes.boundingRect(
+            with: NSSize(width: width - 20, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]
+        ).height
+        let height = min(170, max(54, ceil(textHeight) + 18))
+
+        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .bezelBorder
+        scrollView.drawsBackground = false
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        textView.isEditable = false
+        textView.isSelectable = true
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 6, height: 8)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textStorage?.setAttributedString(notes)
+
+        scrollView.documentView = textView
+        return scrollView
     }
 
     private func presentUpToDateAlert(current: SemanticVersion) {

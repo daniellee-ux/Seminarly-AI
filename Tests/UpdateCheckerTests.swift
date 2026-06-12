@@ -96,23 +96,77 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(UpdateChecker.displayName(for: makeRelease(tag: "v0.2.0", name: "   ")), "Version 0.2.0")
     }
 
-    func testShortReleaseNotesTruncatesByLines() {
-        let body = (1...20).map { "line \($0)" }.joined(separator: "\n")
-        let notes = UpdateChecker.shortReleaseNotes(body, maxLines: 5, maxCharacters: 1000)
-        let unwrapped = try? XCTUnwrap(notes)
-        XCTAssertTrue(unwrapped?.contains("line 1") == true)
-        XCTAssertTrue(unwrapped?.contains("line 5") == true)
-        XCTAssertFalse(unwrapped?.contains("line 6") == true)
-        XCTAssertTrue(unwrapped?.contains("…") == true)
+    func testReleaseNotesSummaryIsNilForEmptyOrNil() {
+        XCTAssertNil(UpdateChecker.releaseNotesSummary(nil))
+        XCTAssertNil(UpdateChecker.releaseNotesSummary("   \n  "))
     }
 
-    func testShortReleaseNotesIsNilForEmptyOrNil() {
-        XCTAssertNil(UpdateChecker.shortReleaseNotes(nil))
-        XCTAssertNil(UpdateChecker.shortReleaseNotes("   \n  "))
+    func testReleaseNotesSummaryDropsTitleAndBoilerplate() {
+        let body = """
+        **Seminarly v0.1.4** — a maintenance release.
+
+        ### Changed
+        - First change
+        - Second change
+
+        ### Updating from v0.1.3
+        1. Quit Seminarly.
+        2. Download below.
+
+        **Requires** macOS 14.4+
+
+        **Full changelog:** https://example.com/compare
+        """
+        let text = try? XCTUnwrap(UpdateChecker.releaseNotesSummary(body))
+        // Keeps the "what's new" section…
+        XCTAssertTrue(text?.contains("### Changed") == true)
+        XCTAssertTrue(text?.contains("- First change") == true)
+        XCTAssertTrue(text?.contains("- Second change") == true)
+        // …drops the duplicate title line and all the boilerplate.
+        XCTAssertFalse(text?.contains("Seminarly v0.1.4") == true)
+        XCTAssertFalse(text?.contains("Updating") == true)
+        XCTAssertFalse(text?.contains("Quit Seminarly") == true)
+        XCTAssertFalse(text?.contains("Requires") == true)
+        XCTAssertFalse(text?.contains("Full changelog") == true)
     }
 
-    func testShortReleaseNotesPassesThroughShortBody() {
-        XCTAssertEqual(UpdateChecker.shortReleaseNotes("- One change"), "- One change")
+    func testReleaseNotesSummaryStopsAtHorizontalRule() {
+        XCTAssertEqual(UpdateChecker.releaseNotesSummary("- Kept\n\n---\n\n- Dropped after rule"), "- Kept")
+    }
+
+    func testReleaseNotesSummaryPassesThroughPlainBody() {
+        XCTAssertEqual(
+            UpdateChecker.releaseNotesSummary("Bug fixes and improvements."),
+            "Bug fixes and improvements."
+        )
+    }
+
+    func testRenderedReleaseNotesStripsRawMarkdown() {
+        let rendered = UpdateChecker.renderedReleaseNotes("### Changed\n- A **bold** point and `code`")
+        let plain = try? XCTUnwrap(rendered).string
+        // Rendered to attributed text → markers gone, headings flattened, bullets shown.
+        XCTAssertFalse(plain?.contains("**") == true)
+        XCTAssertFalse(plain?.contains("###") == true)
+        XCTAssertTrue(plain?.contains("Changed") == true)
+        XCTAssertTrue(plain?.contains("•") == true)
+        XCTAssertTrue(plain?.contains("bold") == true)
+        XCTAssertTrue(plain?.contains("code") == true)
+    }
+
+    func testRenderedReleaseNotesIsNilForEmpty() {
+        XCTAssertNil(UpdateChecker.renderedReleaseNotes(nil))
+        XCTAssertNil(UpdateChecker.renderedReleaseNotes("  "))
+    }
+
+    // MARK: - Download URL
+
+    func testDownloadURLPointsAtLatestAsset() {
+        // The Download button relies on GitHub's latest-asset redirect; guard the
+        // exact string (the constant is force-unwrapped, so a typo crashes at launch).
+        XCTAssertEqual(
+            UpdateChecker.downloadURL.absoluteString,
+            "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+        )
     }
 
     // MARK: - UpdateSettings.isDue (pure timing)

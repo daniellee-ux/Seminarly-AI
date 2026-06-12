@@ -107,7 +107,7 @@ struct ContentView: View {
                         if !viewingRecording, let release = updateChecker.availableUpdate {
                             UpdateBannerView(
                                 versionTitle: UpdateChecker.displayName(for: release),
-                                onDownload: { updateChecker.openDownloadPage(for: release) },
+                                onDownload: { updateChecker.openDownload() },
                                 onDismiss: { updateChecker.dismissBanner() }
                             )
                             .transition(.move(edge: .top).combined(with: .opacity))
