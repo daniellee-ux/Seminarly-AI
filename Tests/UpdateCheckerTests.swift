@@ -78,6 +78,12 @@ final class UpdateCheckerTests: XCTestCase {
         guard case .upToDate = outcome else { return XCTFail("Expected .upToDate, got \(outcome)") }
     }
 
+    func testTrailingDashTagIsTreatedAsUpToDate() {
+        // A malformed "vX.Y.Z-" tag must not surface as a stable update.
+        let outcome = UpdateChecker.evaluate(currentVersion: "0.1.1", release: makeRelease(tag: "v2.0.0-"))
+        guard case .upToDate = outcome else { return XCTFail("Expected .upToDate, got \(outcome)") }
+    }
+
     // MARK: - displayName / shortReleaseNotes
 
     func testDisplayNamePrefersReleaseName() {

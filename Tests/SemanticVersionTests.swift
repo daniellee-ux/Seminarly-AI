@@ -64,6 +64,12 @@ final class SemanticVersionTests: XCTestCase {
         XCTAssertNil(SemanticVersion("1.0.0-alpha..1"))
     }
 
+    func testRejectsTrailingDash() {
+        // A bare trailing "-" must not be parsed as the stable "2.0.0".
+        XCTAssertNil(SemanticVersion("2.0.0-"))
+        XCTAssertNil(SemanticVersion("v2.0.0-"))
+    }
+
     // MARK: - Ordering (the headline cases)
 
     func testNumericNotLexicalComparison() {

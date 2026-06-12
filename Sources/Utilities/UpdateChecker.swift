@@ -62,7 +62,10 @@ final class UpdateChecker: ObservableObject {
     /// `UpdateBannerView`. Manual checks present an `NSAlert` and leave this nil.
     @Published private(set) var availableUpdate: GitHubRelease?
 
-    private var isChecking = false
+    /// Mode of the in-flight check, or nil when idle. Tracked (rather than a plain
+    /// bool) so a manual request arriving mid-check can promote the running check
+    /// to `.manual` instead of being silently dropped.
+    private var activeMode: UpdateCheckMode?
 
     nonisolated private static let releasesURL = URL(
         string: "https://api.github.com/repos/daniellee-ux/Seminarly-AI/releases/latest"
@@ -78,14 +81,21 @@ final class UpdateChecker: ObservableObject {
     // MARK: - Public entry points
 
     func checkForUpdates(mode: UpdateCheckMode) {
-        guard !isChecking else { return }
-        isChecking = true
+        if activeMode != nil {
+            // A check is already running — don't fire a second network request, but
+            // honor an explicit manual request by upgrading how the in-flight check
+            // reports (quiet banner → alert, and surface up-to-date / errors). Keeps
+            // a clicked "Check for Updates…" from looking like a no-op at launch.
+            if mode == .manual { activeMode = .manual }
+            return
+        }
+        activeMode = mode
         // Stamp the time up front so repeated launches don't re-hit GitHub even if
         // the network is slow or failing.
         if mode == .automatic {
             UpdateSettings.shared.markCheckedNow()
         }
-        Task { await performCheck(mode: mode) }
+        Task { await performCheck() }
     }
 
     func dismissBanner() {
@@ -182,24 +192,28 @@ final class UpdateChecker: ObservableObject {
 
     // MARK: - Orchestration
 
-    private func performCheck(mode: UpdateCheckMode) async {
-        defer { isChecking = false }
+    private func performCheck() async {
+        defer { activeMode = nil }
         do {
             let release = try await Self.fetchLatestRelease()
+            // Read the effective mode *after* the round-trip so a manual request that
+            // promoted the check while it was in flight is honored.
+            let isManual = activeMode == .manual
             switch Self.evaluate(currentVersion: Self.currentVersionString, release: release) {
             case .updateAvailable(let release, let latest):
                 logger.notice("Update available: \(latest.description, privacy: .public)")
-                switch mode {
-                case .manual: presentUpdateAlert(release: release, latest: latest)
-                case .automatic: availableUpdate = release
+                if isManual {
+                    presentUpdateAlert(release: release, latest: latest)
+                } else {
+                    availableUpdate = release
                 }
             case .upToDate(let current):
                 logger.info("Up to date at \(current.description, privacy: .public)")
-                if mode == .manual { presentUpToDateAlert(current: current) }
+                if isManual { presentUpToDateAlert(current: current) }
             }
         } catch {
             logger.error("Update check failed: \(error.localizedDescription, privacy: .public)")
-            if mode == .manual { presentErrorAlert(error: error) }
+            if activeMode == .manual { presentErrorAlert(error: error) }
         }
     }
 

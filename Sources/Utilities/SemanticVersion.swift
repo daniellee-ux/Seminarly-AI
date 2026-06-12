@@ -54,11 +54,14 @@ struct SemanticVersion: Equatable, Comparable, CustomStringConvertible {
         self.minor = numbers[1]
         self.patch = numbers[2]
 
-        if let prereleaseSegment, !prereleaseSegment.isEmpty {
+        if let prereleaseSegment {
+            // A "-" was present, so a non-empty pre-release is required: a bare
+            // "1.0.0-", or any empty identifier like "1.0.0-alpha..1", is malformed
+            // and must be rejected — not silently parsed as the stable "1.0.0".
+            guard !prereleaseSegment.isEmpty else { return nil }
             let identifiers = prereleaseSegment
                 .split(separator: ".", omittingEmptySubsequences: false)
                 .map(String.init)
-            // An empty identifier (e.g. "1.0.0-alpha..1") is malformed.
             guard !identifiers.contains(where: \.isEmpty) else { return nil }
             self.prerelease = identifiers
         } else {
