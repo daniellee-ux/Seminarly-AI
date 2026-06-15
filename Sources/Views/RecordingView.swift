@@ -915,6 +915,9 @@ struct RecordingView: View {
         logger.info("Recording stopped. Duration: \(String(format: "%.1f", duration))s, systemSamples: \(recording.systemSamples.count), micSamples: \(recording.micSamples?.count ?? 0)")
 
         isProcessingNotes = true
+        // Mark the session as finalizing so ContentView won't rebuild this view
+        // (which shares transcriptionEngine) out from under the save below.
+        appState.isFinalizing = true
 
         Task {
             // 1. Finalize transcription
@@ -1003,6 +1006,7 @@ struct RecordingView: View {
             selectedMeeting = meeting
 
             isProcessingNotes = false
+            appState.isFinalizing = false
             savedMeeting = meeting
         }
     }

@@ -141,6 +141,7 @@ struct ContentView: View {
                         } else if !viewingRecording {
                             Button {
                                 selectedMeeting = nil
+                                preSelectedProcess = nil
                                 presentRecording()
                             } label: {
                                 Image(systemName: "record.circle")
@@ -358,6 +359,7 @@ struct ContentView: View {
                 actionTitle: "Start Recording",
                 action: {
                     selectedMeeting = nil
+                    preSelectedProcess = nil
                     presentRecording()
                 },
                 accessory: { cliOffer }
@@ -428,17 +430,21 @@ struct ContentView: View {
         }
     }
 
-    /// Brings the recording view forward. When no recording is in progress this
-    /// starts a *fresh* session: bumping `recordingSessionID` re-keys RecordingView
-    /// so SwiftUI rebuilds it from scratch. Without the re-key, a finished
-    /// recording that's still mounted — because the user navigated away from the
-    /// saved screen (tapping another session / Settings) without pressing Done,
-    /// which leaves `showingRecording` true — would simply be re-revealed, leaving
-    /// them stuck on the old "Recording saved" screen instead of a new recording.
-    /// While a recording IS active we only re-reveal it, never re-key, so an
-    /// in-progress capture is never destroyed.
+    /// Brings the recording view forward. When no recording is live or finalizing
+    /// this starts a *fresh* session: bumping `recordingSessionID` re-keys
+    /// RecordingView so SwiftUI rebuilds it from scratch. Without the re-key, a
+    /// finished recording that's still mounted — because the user navigated away
+    /// from the saved screen (tapping another session / Settings) without pressing
+    /// Done, which leaves `showingRecording` true — would simply be re-revealed,
+    /// leaving them stuck on the old "Recording saved" screen instead of a new
+    /// recording.
+    ///
+    /// We never re-key while a recording is active *or still finalizing* — only
+    /// re-reveal it — so an in-progress capture, or a stopped session still being
+    /// transcribed/saved on its background Task (which shares transcriptionEngine),
+    /// is never torn down mid-flight.
     private func presentRecording() {
-        if !appState.isRecording {
+        if !appState.isRecording && !appState.isFinalizing {
             recordingSessionID += 1
         }
         showingRecording = true

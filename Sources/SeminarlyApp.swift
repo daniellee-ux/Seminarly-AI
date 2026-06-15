@@ -9,6 +9,10 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Data
 final class AppState {
     var isRecording = false
     var isPaused = false
+    /// True after Stop while the session is still finalizing (transcription,
+    /// diarization, save). `isRecording` is already false here, so callers that
+    /// must not disturb the in-flight session check this too.
+    var isFinalizing = false
     var recordingElapsedTime: TimeInterval = 0
 }
 
