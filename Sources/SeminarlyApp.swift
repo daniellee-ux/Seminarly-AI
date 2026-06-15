@@ -9,10 +9,12 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Data
 final class AppState {
     var isRecording = false
     var isPaused = false
-    /// True after Stop while the session is still finalizing (transcription,
-    /// diarization, save). `isRecording` is already false here, so callers that
-    /// must not disturb the in-flight session check this too.
-    var isFinalizing = false
+    /// True only while RecordingView is mounted in its post-recording (saved)
+    /// state, i.e. its `savedMeeting` is set. Lets ContentView tell a *finished*
+    /// recording (rebuild fresh on the next "Record") apart from a setup,
+    /// recording, or still-finalizing view (all of which must be preserved) —
+    /// none of which are distinguishable from `isRecording`/`isPaused` alone.
+    var recordingSaved = false
     var recordingElapsedTime: TimeInterval = 0
 }
 

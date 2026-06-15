@@ -430,21 +430,20 @@ struct ContentView: View {
         }
     }
 
-    /// Brings the recording view forward. When no recording is live or finalizing
-    /// this starts a *fresh* session: bumping `recordingSessionID` re-keys
-    /// RecordingView so SwiftUI rebuilds it from scratch. Without the re-key, a
-    /// finished recording that's still mounted — because the user navigated away
-    /// from the saved screen (tapping another session / Settings) without pressing
-    /// Done, which leaves `showingRecording` true — would simply be re-revealed,
-    /// leaving them stuck on the old "Recording saved" screen instead of a new
-    /// recording.
+    /// Brings the recording view forward. If a *finished* recording is still
+    /// mounted — because the user navigated away from the saved screen (tapping
+    /// another session / Settings) without pressing Done, which leaves
+    /// `showingRecording` true — bumping `recordingSessionID` re-keys RecordingView
+    /// so SwiftUI rebuilds it from scratch; otherwise the stale "Recording saved"
+    /// screen would just be re-revealed instead of a new recording.
     ///
-    /// We never re-key while a recording is active *or still finalizing* — only
-    /// re-reveal it — so an in-progress capture, or a stopped session still being
-    /// transcribed/saved on its background Task (which shares transcriptionEngine),
-    /// is never torn down mid-flight.
+    /// We re-key *only* in that saved state (`appState.recordingSaved`). A setup
+    /// view (unsaved notes/chip selections), an active capture, and a stopped
+    /// session still finalizing on its background Task (which shares
+    /// transcriptionEngine) are all left mounted and merely re-revealed, never
+    /// torn down mid-flight.
     private func presentRecording() {
-        if !appState.isRecording && !appState.isFinalizing {
+        if appState.recordingSaved {
             recordingSessionID += 1
         }
         showingRecording = true
