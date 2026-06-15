@@ -8,6 +8,9 @@ struct ContentView: View {
     @Query(sort: \Meeting.date, order: .reverse) private var meetings: [Meeting]
     @State private var selectedMeeting: Meeting?
     @State private var showingRecording = false
+    // Bumped every time a *new* recording is started, to re-key RecordingView so
+    // SwiftUI rebuilds it fresh (see presentRecording()).
+    @State private var recordingSessionID = 0
     @State private var showingSettings = false
     @State private var searchText = ""
     @State private var showDeleteConfirmation = false
@@ -94,8 +97,7 @@ struct ContentView: View {
                                 onRecord: {
                                     preSelectedProcess = audioMonitor.accept()
                                     selectedMeeting = nil
-                                    showingRecording = true
-                                    viewingRecording = true
+                                    presentRecording()
                                 },
                                 onDismiss: {
                                     audioMonitor.dismiss()
@@ -139,8 +141,8 @@ struct ContentView: View {
                         } else if !viewingRecording {
                             Button {
                                 selectedMeeting = nil
-                                showingRecording = true
-                                viewingRecording = true
+                                preSelectedProcess = nil
+                                presentRecording()
                             } label: {
                                 Image(systemName: "record.circle")
                                     .foregroundStyle(SeminarlyColors.recording)
@@ -334,6 +336,7 @@ struct ContentView: View {
                         viewingRecording = false
                     }
                 )
+                .id(recordingSessionID)
                 .opacity(viewingRecording ? 1 : 0)
                 .allowsHitTesting(viewingRecording)
             }
@@ -356,8 +359,8 @@ struct ContentView: View {
                 actionTitle: "Start Recording",
                 action: {
                     selectedMeeting = nil
-                    showingRecording = true
-                    viewingRecording = true
+                    preSelectedProcess = nil
+                    presentRecording()
                 },
                 accessory: { cliOffer }
             )
@@ -425,6 +428,26 @@ struct ContentView: View {
         } catch {
             cliOfferError = error.localizedDescription
         }
+    }
+
+    /// Brings the recording view forward. If a *finished* recording is still
+    /// mounted — because the user navigated away from the saved screen (tapping
+    /// another session / Settings) without pressing Done, which leaves
+    /// `showingRecording` true — bumping `recordingSessionID` re-keys RecordingView
+    /// so SwiftUI rebuilds it from scratch; otherwise the stale "Recording saved"
+    /// screen would just be re-revealed instead of a new recording.
+    ///
+    /// We re-key *only* in that saved state (`appState.recordingSaved`). A setup
+    /// view (unsaved notes/chip selections), an active capture, and a stopped
+    /// session still finalizing on its background Task (which shares
+    /// transcriptionEngine) are all left mounted and merely re-revealed, never
+    /// torn down mid-flight.
+    private func presentRecording() {
+        if appState.recordingSaved {
+            recordingSessionID += 1
+        }
+        showingRecording = true
+        viewingRecording = true
     }
 
     private func formatTime(_ time: TimeInterval) -> String {

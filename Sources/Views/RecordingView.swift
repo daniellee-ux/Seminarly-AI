@@ -95,11 +95,19 @@ struct RecordingView: View {
                 }
         }
         .task {
+            // A freshly built view starts in setup (savedMeeting == nil), so it's
+            // not a saved recording until stopRecording() finishes.
+            appState.recordingSaved = false
             transcriptionEngine.reset()
             captureManager.refreshProcessList()
             if let preSelectedProcess {
                 captureManager.selectedProcess = preSelectedProcess
             }
+        }
+        .onDisappear {
+            // This instance is leaving the hierarchy (dismissed or rebuilt), so
+            // no saved recording is mounted anymore.
+            appState.recordingSaved = false
         }
         // Sync local chip selection with Settings changes while still in the setup
         // phase. RecordingView is kept alive behind an opacity layer when the user
@@ -1004,6 +1012,9 @@ struct RecordingView: View {
 
             isProcessingNotes = false
             savedMeeting = meeting
+            // Now in the post-recording (saved) state — let ContentView rebuild
+            // this view fresh on the next "Record" instead of re-showing it.
+            appState.recordingSaved = true
         }
     }
 
