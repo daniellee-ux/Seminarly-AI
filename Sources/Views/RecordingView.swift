@@ -12,7 +12,7 @@ struct RecordingView: View {
     @StateObject private var captureManager = AudioCaptureManager()
     @ObservedObject var transcriptionEngine: TranscriptionEngine
     @ObservedObject var diarizationEngine: NeuralDiarizationEngine
-    @StateObject private var noteService = NoteStructuringService()
+    @ObservedObject private var enhancement = EnhancementCoordinator.shared
     @ObservedObject private var templateSettings = TemplateSettings.shared
     @ObservedObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @ObservedObject var audioMonitor: AudioSourceMonitor
@@ -238,12 +238,12 @@ struct RecordingView: View {
                 structuredNote: meeting.structuredNote,
                 isEditable: meeting.structuredNote == nil,
                 placeholderTitle: "No notes typed during recording",
-                placeholderSubtitle: noteService.hasAPIKey
+                placeholderSubtitle: enhancement.hasAPIKey
                     ? "Click Enhance to generate notes from the transcript"
-                    : "Add your \(noteService.currentProviderDisplayName) API key in Settings to generate notes"
+                    : "Add your \(enhancement.currentProviderDisplayName) API key in Settings to generate notes"
             )
             .overlay {
-                if noteService.isProcessing {
+                if enhancement.isEnhancing(meeting) {
                     SeminarlyColors.background.opacity(0.6)
                         .overlay {
                             VStack(spacing: Spacing.sm) {
@@ -286,7 +286,7 @@ struct RecordingView: View {
 
             Spacer()
 
-            if let error = noteService.errorMessage {
+            if let error = enhancement.error(for: meeting) {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .font(Typography.caption)
                     .foregroundStyle(SeminarlyColors.destructive)
@@ -305,7 +305,7 @@ struct RecordingView: View {
                         .background(canEnhance ? SeminarlyColors.accent : SeminarlyColors.textTertiary, in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.plain)
-                .disabled(!canEnhance || noteService.isProcessing)
+                .disabled(!canEnhance || enhancement.isEnhancing(meeting))
                 .help(enhanceHelpText(for: meeting))
             } else {
                 Button {
@@ -316,7 +316,7 @@ struct RecordingView: View {
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
                 .buttonStyle(.plain)
-                .disabled(!canEnhance || noteService.isProcessing)
+                .disabled(!canEnhance || enhancement.isEnhancing(meeting))
                 .help("Choose template and language, then re-run enhancement")
             }
 
@@ -336,12 +336,12 @@ struct RecordingView: View {
     private func enhanceButtonEnabled(for meeting: Meeting) -> Bool {
         guard let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
-              noteService.hasAPIKey else { return false }
+              enhancement.hasAPIKey else { return false }
         return true
     }
 
     private func enhanceHelpText(for meeting: Meeting) -> String {
-        if !noteService.hasAPIKey { return "Add \(noteService.currentProviderDisplayName) API key in Settings" }
+        if !enhancement.hasAPIKey { return "Add \(enhancement.currentProviderDisplayName) API key in Settings" }
         if meeting.transcript?.rawText.isEmpty ?? true { return "No transcript available" }
         return "Choose template and language, then generate structured notes"
     }
@@ -1054,55 +1054,36 @@ struct RecordingView: View {
         guard let meeting = savedMeeting,
               let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
-              noteService.hasAPIKey,
-              !noteService.isProcessing else { return }
+              enhancement.hasAPIKey else { return }
 
         let currentNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
         meeting.userNotesText = currentNotes.isEmpty ? nil : currentNotes
-        let targetTemplate = template
-        let targetSummaryLanguage = summaryLanguage
 
-        Task {
-            let result: (title: String, note: StructuredNote)?
-
-            if !currentNotes.isEmpty {
-                // User typed notes — enhance with transcript context
-                let notesForPrompt: String
-                if let stamps = meeting.timestampedNotes, !stamps.isEmpty {
-                    notesForPrompt = TimestampedNote.formatForPrompt(stamps)
-                } else {
-                    notesForPrompt = currentNotes
-                }
-                logger.info("Enhancement: mode=enhance, userNotes=\(currentNotes.count) chars, template=\(targetTemplate.rawValue)")
-                result = await noteService.enhanceNotes(
-                    userNotes: notesForPrompt,
-                    transcript: transcript.diarizedText,
-                    template: targetTemplate,
-                    customInstructions: targetTemplate == .custom ? customInstructions : nil,
-                    summaryLanguage: targetSummaryLanguage
-                )
-            } else {
-                // No user notes — standard transcript structuring
-                logger.info("Enhancement: mode=transcript-only, template=\(targetTemplate.rawValue)")
-                result = await noteService.structureTranscript(
-                    transcript.diarizedText,
-                    template: targetTemplate,
-                    customInstructions: targetTemplate == .custom ? customInstructions : nil,
-                    summaryLanguage: targetSummaryLanguage
-                )
-            }
-
-            guard let result = result else { return }
-
-            meeting.title = result.title
-            meeting.structuredNote = result.note
-            result.note.meeting = meeting
-            try? modelContext.save()
-
-            let userCount = result.note.sections.flatMap(\.items).filter { $0.source == .user }.count
-            let transcriptCount = result.note.sections.flatMap(\.items).filter { $0.source == .transcript }.count
-            logger.info("Enhanced notes: \(userCount) user-sourced items, \(transcriptCount) transcript-sourced items")
+        // Persist the raw notes as userNotesText (above), but show the model the
+        // timestamped form when we have it — it carries when each note was taken.
+        let notesForPrompt: String?
+        let mode: String
+        if currentNotes.isEmpty {
+            notesForPrompt = nil
+            mode = "transcript-only"
+        } else if let stamps = meeting.timestampedNotes, !stamps.isEmpty {
+            notesForPrompt = TimestampedNote.formatForPrompt(stamps)
+            mode = "enhance"
+        } else {
+            notesForPrompt = currentNotes
+            mode = "enhance"
         }
+        logger.info("Enhancement: mode=\(mode), userNotes=\(currentNotes.count) chars, template=\(template.rawValue)")
+
+        enhancement.enhance(
+            meeting: meeting,
+            transcript: transcript.diarizedText,
+            userNotes: notesForPrompt,
+            template: template,
+            customInstructions: template == .custom ? customInstructions : nil,
+            summaryLanguage: summaryLanguage,
+            modelContext: modelContext
+        )
     }
 }
 

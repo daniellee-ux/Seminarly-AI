@@ -4,7 +4,7 @@ import SwiftData
 struct MeetingDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var meeting: Meeting
-    @StateObject private var noteService = NoteStructuringService()
+    @ObservedObject private var enhancement = EnhancementCoordinator.shared
     @State private var selectedTab = 0
     @State private var isEditing = false
     @State private var editedTitle: String = ""
@@ -13,8 +13,6 @@ struct MeetingDetailView: View {
     @State private var rediarizeStatus = ""
     @State private var editableUserNotes: String = ""
     @State private var showRegenerateSheet = false
-    @State private var processingMeeting: Meeting?
-    @State private var errorMeeting: Meeting?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -105,32 +103,57 @@ struct MeetingDetailView: View {
 
                 Spacer()
 
-                if meeting.transcript != nil && meeting.structuredNote == nil && noteService.hasAPIKey {
+                if meeting.transcript != nil && meeting.structuredNote == nil && enhancement.hasAPIKey {
+                    let generating = enhancement.isEnhancing(meeting)
                     Button {
                         enhanceSmart()
                     } label: {
-                        Label("Enhance with Transcript", systemImage: "sparkles")
-                            .font(Typography.captionMedium)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Spacing.sm)
-                            .padding(.vertical, Spacing.xxs + 2)
-                            .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                        Group {
+                            if generating {
+                                HStack(spacing: Spacing.xxs) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
+                                    Text("Generating...")
+                                }
+                            } else {
+                                Label("Enhance with Transcript", systemImage: "sparkles")
+                            }
+                        }
+                        .font(Typography.captionMedium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs + 2)
+                        .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
-                    .disabled(noteService.isProcessing)
+                    .disabled(generating)
                 }
 
                 if meeting.transcript != nil && meeting.structuredNote != nil {
+                    let generating = enhancement.isEnhancing(meeting)
                     Button {
                         showRegenerateSheet = true
                     } label: {
-                        Label("Regenerate", systemImage: "sparkles")
-                            .font(Typography.caption)
-                            .foregroundStyle(SeminarlyColors.accent)
+                        if generating {
+                            HStack(spacing: Spacing.xxs) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Generating...")
+                                    .font(Typography.caption)
+                            }
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                        } else {
+                            Label("Regenerate", systemImage: "sparkles")
+                                .font(Typography.caption)
+                                .foregroundStyle(SeminarlyColors.accent)
+                        }
                     }
                     .buttonStyle(.plain)
-                    .disabled(noteService.isProcessing || !noteService.hasAPIKey)
-                    .help("Regenerate notes with a different template or language")
+                    .disabled(generating || !enhancement.hasAPIKey)
+                    .help(generating
+                        ? "Generating notes…"
+                        : "Regenerate notes with a different template or language")
                 }
 
                 Menu {
@@ -152,15 +175,6 @@ struct MeetingDetailView: View {
             .font(Typography.caption)
             .foregroundStyle(SeminarlyColors.textSecondary)
 
-            if isGeneratingCurrentMeeting {
-                HStack(spacing: Spacing.xs) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Generating notes...")
-                        .font(Typography.body)
-                        .foregroundStyle(SeminarlyColors.textSecondary)
-                }
-            }
             if let error = currentGenerationError {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(SeminarlyColors.destructive)
@@ -194,8 +208,8 @@ struct MeetingDetailView: View {
     }
 
     private var placeholderSubtitle: String? {
-        if !noteService.hasAPIKey {
-            return "Add your \(noteService.currentProviderDisplayName) API key in Settings to generate notes"
+        if !enhancement.hasAPIKey {
+            return "Add your \(enhancement.currentProviderDisplayName) API key in Settings to generate notes"
         }
         if meeting.transcript == nil || meeting.transcript?.rawText.isEmpty == true {
             return "No transcript available"
@@ -203,14 +217,8 @@ struct MeetingDetailView: View {
         return "Add notes and click Enhance, or use Regenerate to create notes from the transcript"
     }
 
-    private var isGeneratingCurrentMeeting: Bool {
-        guard let processingMeeting else { return false }
-        return noteService.isProcessing && processingMeeting == meeting
-    }
-
     private var currentGenerationError: String? {
-        guard let errorMeeting, errorMeeting == meeting else { return nil }
-        return noteService.errorMessage
+        enhancement.error(for: meeting)
     }
 
     private func syncEditableUserNotes(with targetMeeting: Meeting) {
@@ -341,36 +349,27 @@ struct MeetingDetailView: View {
     }
 
     private func enhanceUserNotes() {
-        guard !noteService.isProcessing,
-              let transcript = meeting.transcript else { return }
+        guard let transcript = meeting.transcript else { return }
         let notes = editableUserNotes.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !notes.isEmpty else { return }
-        let targetMeeting = meeting
-        let targetTranscript = transcript
 
-        let template = targetMeeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate
+        let template = meeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate
         // Inherit the existing note's language if already generated; otherwise fall
         // back to the user's default. This keeps re-enhance idempotent in language.
-        let language: SummaryLanguage = targetMeeting.structuredNote.flatMap {
+        let language: SummaryLanguage = meeting.structuredNote.flatMap {
             SummaryLanguage.fromStorageCode($0.language)
         } ?? SummaryLanguageSettings.shared.defaultLanguage
 
-        beginNoteGeneration(for: targetMeeting)
-        Task {
-            defer { endNoteGeneration(for: targetMeeting) }
-            if let result = await noteService.enhanceNotes(
-                userNotes: notes,
-                transcript: targetTranscript.diarizedText,
-                template: template,
-                summaryLanguage: language
-            ) {
-                targetMeeting.title = result.title
-                targetMeeting.structuredNote = result.note
-                result.note.meeting = targetMeeting
-                targetMeeting.userNotesText = notes
-                try? modelContext.save()
-            }
-        }
+        // The notepad already persists userNotesText via onChange as the user
+        // types, so the coordinator only needs the prompt text here.
+        enhancement.enhance(
+            meeting: meeting,
+            transcript: transcript.diarizedText,
+            userNotes: notes,
+            template: template,
+            summaryLanguage: language,
+            modelContext: modelContext
+        )
     }
 
     private func restoreOriginal() {
@@ -428,58 +427,17 @@ struct MeetingDetailView: View {
     }
 
     private func regenerateNotes(template: NoteTemplate, language: SummaryLanguage) {
-        guard !noteService.isProcessing,
-              let transcript = meeting.transcript else { return }
+        guard let transcript = meeting.transcript else { return }
         let notes = editableUserNotes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let targetMeeting = meeting
-        let targetTranscript = transcript
 
-        beginNoteGeneration(for: targetMeeting)
-        Task {
-            defer { endNoteGeneration(for: targetMeeting) }
-            let result: (title: String, note: StructuredNote)?
-            if notes.isEmpty {
-                result = await noteService.structureTranscript(
-                    targetTranscript.diarizedText,
-                    template: template,
-                    summaryLanguage: language
-                )
-            } else {
-                result = await noteService.enhanceNotes(
-                    userNotes: notes,
-                    transcript: targetTranscript.diarizedText,
-                    template: template,
-                    summaryLanguage: language
-                )
-            }
-            guard let result else { return }
-            targetMeeting.title = result.title
-            targetMeeting.structuredNote = result.note
-            result.note.meeting = targetMeeting
-            if !notes.isEmpty {
-                targetMeeting.userNotesText = notes
-            }
-            try? modelContext.save()
-        }
-    }
-
-    private func beginNoteGeneration(for targetMeeting: Meeting) {
-        processingMeeting = targetMeeting
-        errorMeeting = nil
-    }
-
-    private func endNoteGeneration(for targetMeeting: Meeting) {
-        if let current = processingMeeting, current == targetMeeting {
-            processingMeeting = nil
-        }
-
-        if noteService.errorMessage == nil {
-            if let current = errorMeeting, current == targetMeeting {
-                errorMeeting = nil
-            }
-        } else {
-            errorMeeting = targetMeeting
-        }
+        enhancement.enhance(
+            meeting: meeting,
+            transcript: transcript.diarizedText,
+            userNotes: notes.isEmpty ? nil : notes,
+            template: template,
+            summaryLanguage: language,
+            modelContext: modelContext
+        )
     }
 
     private func exportMarkdown() {
