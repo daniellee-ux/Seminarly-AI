@@ -470,6 +470,10 @@ struct ContentView: View {
             audioMonitor.reseedAfterRecording()
         }
 
+        // Stop any in-flight enhancement so its completion can't write back to
+        // the model we're about to delete.
+        EnhancementCoordinator.shared.cancel(meeting)
+
         meeting.deleteAudioFiles()
         modelContext.delete(meeting)
         try? modelContext.save()

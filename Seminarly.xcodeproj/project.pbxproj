@@ -100,6 +100,7 @@
 		F890A2814F6503B4AB040C4B /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1C13C784D22EA6892736BF /* DesignSystem.swift */; };
 		F8D591649E9948662F091233 /* LanguageAwareDiarizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */; };
 		F99B6713863C741BBF7230BA /* NotepadSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5668818DC5399A91AA48648 /* NotepadSurface.swift */; };
+		FBD8B6B115C29E918538AC40 /* EnhancementCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26924E0209A1D9E8A3CAD208 /* EnhancementCoordinator.swift */; };
 		FC646DE91189E87133786696 /* SessionFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1893FC5504CE291132F1E35C /* SessionFormatter.swift */; };
 		FE398F3C3860F62E4DDCED9D /* SeminarlyCLIInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */; };
 /* End PBXBuildFile section */
@@ -164,6 +165,7 @@
 		2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTapManager.swift; sourceTree = "<group>"; };
 		24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTemplateTests.swift; sourceTree = "<group>"; };
 		265CA05565F97D1DFCD494E8 /* NoteStructuringParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStructuringParsingTests.swift; sourceTree = "<group>"; };
+		26924E0209A1D9E8A3CAD208 /* EnhancementCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnhancementCoordinator.swift; sourceTree = "<group>"; };
 		28C64713853656F00D7A62D6 /* MFCCExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFCCExtractor.swift; sourceTree = "<group>"; };
 		2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptTemplatesLanguageTests.swift; sourceTree = "<group>"; };
 		3367B9D98B71D48FE8F168B9 /* MFCCExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFCCExtractorTests.swift; sourceTree = "<group>"; };
@@ -463,6 +465,7 @@
 			isa = PBXGroup;
 			children = (
 				68B369DF17E4B9D977C8411B /* Providers */,
+				26924E0209A1D9E8A3CAD208 /* EnhancementCoordinator.swift */,
 				E8FA98217C86529B02229D39 /* KeychainStore.swift */,
 				442C1A5FDC026A3F72D52856 /* LLMProvider.swift */,
 				723F4C91D76B4357C6B9ECAC /* LLMProviderCatalog.swift */,
@@ -658,6 +661,7 @@
 				C58818FB8C29B6BEC7353882 /* DatabaseStore.swift in Sources */,
 				F890A2814F6503B4AB040C4B /* DesignSystem.swift in Sources */,
 				AC5416D24451304BF72017EC /* DiarizationEngine.swift in Sources */,
+				FBD8B6B115C29E918538AC40 /* EnhancementCoordinator.swift in Sources */,
 				991A2C2E4DC17237C6EDF5FD /* GeminiProvider.swift in Sources */,
 				37DB64DC3AAEA8F76A6D82F6 /* KeychainStore.swift in Sources */,
 				EAACDE7F9E587D612B126BEF /* LLMProvider.swift in Sources */,
