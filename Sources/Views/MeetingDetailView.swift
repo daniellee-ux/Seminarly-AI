@@ -104,31 +104,56 @@ struct MeetingDetailView: View {
                 Spacer()
 
                 if meeting.transcript != nil && meeting.structuredNote == nil && enhancement.hasAPIKey {
+                    let generating = enhancement.isEnhancing(meeting)
                     Button {
                         enhanceSmart()
                     } label: {
-                        Label("Enhance with Transcript", systemImage: "sparkles")
-                            .font(Typography.captionMedium)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, Spacing.sm)
-                            .padding(.vertical, Spacing.xxs + 2)
-                            .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                        Group {
+                            if generating {
+                                HStack(spacing: Spacing.xxs) {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
+                                    Text("Generating...")
+                                }
+                            } else {
+                                Label("Enhance with Transcript", systemImage: "sparkles")
+                            }
+                        }
+                        .font(Typography.captionMedium)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, Spacing.sm)
+                        .padding(.vertical, Spacing.xxs + 2)
+                        .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
                     }
                     .buttonStyle(.plain)
-                    .disabled(enhancement.isEnhancing(meeting))
+                    .disabled(generating)
                 }
 
                 if meeting.transcript != nil && meeting.structuredNote != nil {
+                    let generating = enhancement.isEnhancing(meeting)
                     Button {
                         showRegenerateSheet = true
                     } label: {
-                        Label("Regenerate", systemImage: "sparkles")
-                            .font(Typography.caption)
-                            .foregroundStyle(SeminarlyColors.accent)
+                        if generating {
+                            HStack(spacing: Spacing.xxs) {
+                                ProgressView()
+                                    .controlSize(.small)
+                                Text("Generating...")
+                                    .font(Typography.caption)
+                            }
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                        } else {
+                            Label("Regenerate", systemImage: "sparkles")
+                                .font(Typography.caption)
+                                .foregroundStyle(SeminarlyColors.accent)
+                        }
                     }
                     .buttonStyle(.plain)
-                    .disabled(enhancement.isEnhancing(meeting) || !enhancement.hasAPIKey)
-                    .help("Regenerate notes with a different template or language")
+                    .disabled(generating || !enhancement.hasAPIKey)
+                    .help(generating
+                        ? "Generating notes…"
+                        : "Regenerate notes with a different template or language")
                 }
 
                 Menu {
@@ -150,15 +175,6 @@ struct MeetingDetailView: View {
             .font(Typography.caption)
             .foregroundStyle(SeminarlyColors.textSecondary)
 
-            if isGeneratingCurrentMeeting {
-                HStack(spacing: Spacing.xs) {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("Generating notes...")
-                        .font(Typography.body)
-                        .foregroundStyle(SeminarlyColors.textSecondary)
-                }
-            }
             if let error = currentGenerationError {
                 Label(error, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(SeminarlyColors.destructive)
@@ -199,10 +215,6 @@ struct MeetingDetailView: View {
             return "No transcript available"
         }
         return "Add notes and click Enhance, or use Regenerate to create notes from the transcript"
-    }
-
-    private var isGeneratingCurrentMeeting: Bool {
-        enhancement.isEnhancing(meeting)
     }
 
     private var currentGenerationError: String? {
