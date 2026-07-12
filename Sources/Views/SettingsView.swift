@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(AppState.self) private var appState
     @StateObject private var templateSettings = TemplateSettings.shared
     @StateObject private var llmSettings = LLMSettings.shared
     var onDismiss: () -> Void = {}
@@ -209,8 +210,15 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: transcriptionSettings.whisperModel) { _, newModel in
+                        // Don't swap the model out from under an active recording
+                        // or an in-flight finalization pass; the change then
+                        // applies on next launch as before.
+                        guard !appState.isRecording, !TranscriptionEngine.shared.isTranscribing else { return }
+                        Task { await TranscriptionEngine.shared.loadModel(name: newModel) }
+                    }
 
-                    Text("Takes effect on next app launch. Turbo is recommended (fastest, latest). Models are cached after first download.")
+                    Text("Switches now (downloads first if needed); if a recording is running, applies on next launch. Turbo is recommended (fastest, latest). Models are cached after first download.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

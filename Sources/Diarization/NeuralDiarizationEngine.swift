@@ -6,6 +6,10 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Neur
 
 @MainActor
 final class NeuralDiarizationEngine: ObservableObject {
+    /// App-lifetime instance — models survive window close/reopen (see
+    /// TranscriptionEngine.shared for rationale).
+    static let shared = NeuralDiarizationEngine()
+
     @Published var isDiarizing = false
     @Published var isModelReady = false
     @Published var modelStatus = ""
@@ -29,13 +33,31 @@ final class NeuralDiarizationEngine: ObservableObject {
         return OfflineDiarizerManager(config: config)
     }()
 
+    // Engine-owned so a window closing mid-prepare cannot abort it, and
+    // concurrent callers (window .task, Retry banner) join instead of racing.
+    private var prepareTask: Task<Void, Never>?
+
     /// Download and prepare neural diarization models (runs once, cached).
     func prepareModels() async {
         guard !isModelReady else {
             logger.info("Models already ready, skipping preparation")
             return
         }
-        modelStatus = "Downloading speaker diarization models..."
+        if let inFlight = prepareTask {
+            await inFlight.value
+            return
+        }
+        let task = Task { await performPrepare() }
+        prepareTask = task
+        await task.value
+        if prepareTask == task {
+            prepareTask = nil
+        }
+    }
+
+    private func performPrepare() async {
+        errorMessage = nil
+        modelStatus = "Preparing speaker diarization models..."
         logger.info("Starting model preparation...")
         do {
             try await diarizer.prepareModels()

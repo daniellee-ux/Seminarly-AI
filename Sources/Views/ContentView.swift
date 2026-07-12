@@ -26,8 +26,10 @@ struct ContentView: View {
     @State private var cliOfferConfirmation: String?
     @State private var cliOfferError: String?
 
-    @StateObject private var transcriptionEngine = TranscriptionEngine()
-    @StateObject private var diarizationEngine = NeuralDiarizationEngine()
+    // Shared app-lifetime engines: a new window (close/reopen, Cmd+N) reuses the
+    // already-loaded models instead of re-downloading and re-loading them.
+    @ObservedObject private var transcriptionEngine = TranscriptionEngine.shared
+    @ObservedObject private var diarizationEngine = NeuralDiarizationEngine.shared
     @StateObject private var audioMonitor = AudioSourceMonitor()
     @StateObject private var updateChecker = UpdateChecker.shared
 
@@ -207,8 +209,13 @@ struct ContentView: View {
             }
         }
         .task {
-            await transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
-            await diarizationEngine.prepareModels()
+            // Load both models concurrently — a slow (or hung) transcription
+            // download must not block diarization prep, and vice versa. The
+            // engines own their load tasks, so repeat calls from a reopened
+            // window join the in-flight work or no-op when already loaded.
+            async let transcription: Void = transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
+            async let diarization: Void = diarizationEngine.prepareModels()
+            _ = await (transcription, diarization)
             audioMonitor.startMonitoring()
         }
         .task {

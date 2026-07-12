@@ -98,7 +98,11 @@ struct RecordingView: View {
             // A freshly built view starts in setup (savedMeeting == nil), so it's
             // not a saved recording until stopRecording() finishes.
             appState.recordingSaved = false
-            transcriptionEngine.reset()
+            // The engine is shared app-wide: a setup view opening in another
+            // window must not wipe a recording that is live elsewhere.
+            if !appState.isRecording {
+                transcriptionEngine.reset()
+            }
             captureManager.refreshProcessList()
             if let preSelectedProcess {
                 captureManager.selectedProcess = preSelectedProcess
@@ -108,6 +112,13 @@ struct RecordingView: View {
             // This instance is leaving the hierarchy (dismissed or rebuilt), so
             // no saved recording is mounted anymore.
             appState.recordingSaved = false
+            // If the view is torn down while recording (window closed mid-recording),
+            // its captureManager died with it — clear the app-wide flags so the
+            // menu bar and other windows don't report a phantom recording forever.
+            if isRecording || isPaused {
+                appState.isRecording = false
+                appState.isPaused = false
+            }
         }
         // Sync local chip selection with Settings changes while still in the setup
         // phase. RecordingView is kept alive behind an opacity layer when the user
@@ -682,6 +693,9 @@ struct RecordingView: View {
     }
 
     private var recordingReadiness: (canStart: Bool, help: String) {
+        // Engines are shared app-wide — a second window must not start a
+        // concurrent recording over the live one.
+        if appState.isRecording { return (false, "A recording is already in progress") }
         if let err = transcriptionEngine.errorMessage { return (false, err) }
         if let err = diarizationEngine.errorMessage { return (false, err) }
         if !transcriptionEngine.isModelLoaded { return (false, "Loading transcription model...") }
@@ -832,6 +846,7 @@ struct RecordingView: View {
     }
 
     private func startRecording() {
+        guard !appState.isRecording else { return }
         transcriptionEngine.reset()
 
         // Preserve any notes the user jotted down during the setup phase rather
