@@ -25,6 +25,14 @@ final class TranscriptionEngine: ObservableObject {
     /// When nil, WhisperKit auto-detects per chunk.
     var selectedLanguage: String?
 
+    /// True from the moment a recording claims the engine until its post-stop
+    /// finalization pipeline has read everything it needs. The engine is shared
+    /// app-wide, and `appState.isRecording` goes false at stop time — several
+    /// seconds before finalization finishes — so this is the only signal that
+    /// covers the whole window in which a reset or model swap would corrupt or
+    /// lose a recording's transcript.
+    @Published private(set) var isSessionActive = false
+
     /// Name of the currently loaded model variant; nil while unloaded/loading.
     private(set) var loadedModelName: String?
 
@@ -41,13 +49,25 @@ final class TranscriptionEngine: ObservableObject {
     private var loadingModelName: String?
 
     func loadModel(name: String = TranscriptionSettings.defaultModel) async {
-        if isModelLoaded && loadedModelName == name { return }
+        if isModelLoaded && loadedModelName == name {
+            // A matching loaded model makes any prior load error stale — clear
+            // it so it can't keep the Record button disabled.
+            errorMessage = nil
+            return
+        }
+
+        // Never swap models while a recording session is using the engine — a
+        // new window's .task or a Settings change must not tear the model out
+        // from under a live recording or its finalization.
+        if isSessionActive && isModelLoaded { return }
 
         // Join an in-flight load of the same model; supersede one of a different
         // model. Loop: by the time a superseded task drains, another caller may
         // have started a new one.
         while let inFlight = loadTask {
-            if loadingModelName == name {
+            // A cancelled task is already superseded — never join it (its result
+            // will be discarded); fall through to drain and restart.
+            if loadingModelName == name, !inFlight.isCancelled {
                 await inFlight.value
                 return
             }
@@ -72,36 +92,41 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     private func performLoad(name: String) async {
+        // Re-check: a recording may have claimed the engine between loadModel's
+        // guard and this task's first turn on the MainActor — never tear the
+        // model out from under it.
+        if isSessionActive && whisperKit != nil { return }
+
         errorMessage = nil
+        // Block new recordings during the swap, but keep the old instance alive
+        // until the replacement has loaded — a failed switch must not strand
+        // the user with no model at all. Cost: both models are transiently
+        // resident during a (rare, user-initiated) switch.
+        let previousKit = whisperKit
+        let previousName = loadedModelName
         isModelLoaded = false
         loadedModelName = nil
-        whisperKit = nil
-
-        // Offline-first: a fully installed model loads straight from disk with
-        // zero network. WhisperKit.download always hits huggingface.co before
-        // touching the cache, so an unreachable network (offline, blocked, or a
-        // stalled system proxy) would otherwise hang or fail the load even
-        // though the model is already installed.
-        if let localFolder = Self.installedModelFolder(for: name) {
-            loadingProgress = "Preparing transcription model..."
-            do {
-                whisperKit = try await WhisperKit(
-                    modelFolder: localFolder.path,
-                    verbose: false,
-                    logLevel: .none,
-                    download: false
-                )
-                loadedModelName = name
-                isModelLoaded = true
-                loadingProgress = ""
-                logger.notice("Loaded \(name, privacy: .public) from local cache")
-                return
-            } catch {
-                logger.error("Local load of \(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public) — falling back to download")
-            }
-        }
 
         do {
+            // Offline-first: a fully installed model loads straight from disk with
+            // zero network. WhisperKit.download always hits huggingface.co before
+            // touching the cache, so an unreachable network (offline, blocked, or a
+            // stalled system proxy) would otherwise hang or fail the load even
+            // though the model is already installed.
+            if let localFolder = Self.installedModelFolder(for: name) {
+                do {
+                    try Task.checkCancellation()
+                    loadingProgress = "Preparing transcription model..."
+                    try await loadWhisperKit(from: localFolder, name: name)
+                    logger.notice("Loaded \(name, privacy: .public) from local cache")
+                    return
+                } catch is CancellationError {
+                    throw CancellationError()
+                } catch {
+                    logger.error("Local load of \(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public) — falling back to download")
+                }
+            }
+
             try Task.checkCancellation()
 
             // Step 1: Download with progress
@@ -109,7 +134,8 @@ final class TranscriptionEngine: ObservableObject {
             downloadFraction = 0
             loadingProgress = "Downloading \(name)..."
             let modelFolder = try await WhisperKit.download(
-                variant: name
+                variant: name,
+                downloadBase: Self.modelCacheBase
             ) { @Sendable [weak self] progress in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
@@ -123,19 +149,19 @@ final class TranscriptionEngine: ObservableObject {
 
             // Step 2: Load model from downloaded folder
             loadingProgress = "Preparing transcription model..."
-            whisperKit = try await WhisperKit(
-                modelFolder: modelFolder.path,
-                verbose: false,
-                logLevel: .none,
-                download: false
-            )
-            loadedModelName = name
-            isModelLoaded = true
-            loadingProgress = ""
+            try await loadWhisperKit(from: modelFolder, name: name)
             logger.notice("Loaded \(name, privacy: .public) after download")
         } catch {
             loadingProgress = ""
             isDownloading = false
+            // The old model is still alive (previousKit) — put it back so a
+            // failed switch keeps working instead of stranding the user with
+            // no model at all.
+            if let previousKit {
+                whisperKit = previousKit
+                loadedModelName = previousName
+                isModelLoaded = true
+            }
             // A superseded load (model switched mid-download) is not an error.
             if error is CancellationError || Task.isCancelled {
                 logger.notice("Load of \(name, privacy: .public) cancelled")
@@ -146,16 +172,53 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
+    private func loadWhisperKit(from folder: URL, name: String) async throws {
+        whisperKit = try await WhisperKit(
+            modelFolder: folder.path,
+            verbose: false,
+            logLevel: .none,
+            download: false
+        )
+        loadedModelName = name
+        isModelLoaded = true
+        loadingProgress = ""
+    }
+
+    // MARK: - Recording session lifecycle
+
+    /// Claim the engine for a recording: clears per-session state and blocks
+    /// resets/model swaps from other windows until `endSession()`.
+    func beginSession() {
+        reset()
+        isSessionActive = true
+    }
+
+    /// Release the engine after the post-stop pipeline has consumed its output
+    /// (or after the recording view died mid-recording and no pipeline will run).
+    func endSession() {
+        isSessionActive = false
+    }
+
+    // MARK: - Local model cache
+
+    /// App-pinned Hugging Face cache root. Passed to `WhisperKit.download` and
+    /// used for local lookups, so the app — not the library default — fixes
+    /// where models live. Matches HubApi's historical default on non-sandboxed
+    /// macOS (~/Documents/huggingface), where existing installs already are.
+    nonisolated static var modelCacheBase: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("huggingface")
+    }
+
     /// The folder `WhisperKit.download` would produce for this variant, or nil
     /// unless the model looks installed AND its tokenizer is cached (both are
-    /// needed for a zero-network load). Mirrors HubApi's default layout:
-    /// ~/Documents/huggingface/models/argmaxinc/whisperkit-coreml/<variant>.
+    /// needed for a zero-network load): <modelCacheBase>/models/argmaxinc/whisperkit-coreml/<variant>.
     /// A partial download that slips past this check still fails the WhisperKit
     /// init, which then falls back to the download path.
     nonisolated static func installedModelFolder(for variant: String) -> URL? {
         let fm = FileManager.default
-        guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
-        let folder = documents.appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml/\(variant)")
+        guard let base = modelCacheBase else { return nil }
+        let folder = base.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(variant)")
         // WhisperKit requires exactly these three compiled bundles; the prefill
         // bundle and the *.json files are optional.
         for bundle in ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc"] {
@@ -183,8 +246,8 @@ final class TranscriptionEngine: ObservableObject {
             return false // unknown variant — use the download path
         }
         let fm = FileManager.default
-        guard let documents = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
-        let dir = documents.appendingPathComponent("huggingface/models/\(repo)")
+        guard let base = modelCacheBase else { return false }
+        let dir = base.appendingPathComponent("models/\(repo)")
         return ["tokenizer.json", "tokenizer_config.json"].allSatisfy {
             fm.fileExists(atPath: dir.appendingPathComponent($0).path)
         }

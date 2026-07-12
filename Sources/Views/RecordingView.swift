@@ -54,6 +54,14 @@ struct RecordingView: View {
     // Post-recording lifecycle state (set after stopRecording saves the meeting)
     @State private var savedMeeting: Meeting?
 
+    // True from Record-click until this view's recording session is released
+    // (saved, failed, or torn down). Unlike isRecording/isPaused — which derive
+    // from captureManager.state and are false both before capture actually
+    // starts and after a capture error — this tracks session OWNERSHIP, so
+    // cleanup can't be skipped in those states (which would leak the app-wide
+    // recording flags and the shared engine's session forever).
+    @State private var ownsRecordingSession = false
+
     var body: some View {
         VStack(spacing: 0) {
             if let meeting = savedMeeting {
@@ -99,8 +107,9 @@ struct RecordingView: View {
             // not a saved recording until stopRecording() finishes.
             appState.recordingSaved = false
             // The engine is shared app-wide: a setup view opening in another
-            // window must not wipe a recording that is live elsewhere.
-            if !appState.isRecording {
+            // window must not wipe a recording that is live elsewhere or a
+            // stopped one whose finalization is still consuming the engine.
+            if !appState.isRecording && !transcriptionEngine.isSessionActive {
                 transcriptionEngine.reset()
             }
             captureManager.refreshProcessList()
@@ -112,12 +121,24 @@ struct RecordingView: View {
             // This instance is leaving the hierarchy (dismissed or rebuilt), so
             // no saved recording is mounted anymore.
             appState.recordingSaved = false
-            // If the view is torn down while recording (window closed mid-recording),
-            // its captureManager died with it — clear the app-wide flags so the
-            // menu bar and other windows don't report a phantom recording forever.
-            if isRecording || isPaused {
-                appState.isRecording = false
-                appState.isPaused = false
+            // If the view is torn down while it owns a session whose pipeline
+            // hasn't started (window closed mid-recording, mid-start, or after a
+            // capture error), its captureManager died with it and no pipeline
+            // will run — clear the app-wide flags and release the engine so the
+            // menu bar and other windows don't report a phantom recording
+            // forever. When the pipeline IS running (isProcessingNotes), it
+            // survives this view and releases the session itself.
+            if ownsRecordingSession && !isProcessingNotes {
+                releaseRecordingSession()
+            }
+        }
+        .onChange(of: captureManager.state) { _, newState in
+            // Capture failed to start (or died): isRecording/isPaused turn false
+            // so the Stop button is unreachable, yet the flags set optimistically
+            // in startRecording() would block every retry and model swap forever.
+            // Release the session so the error banner's Retry can start over.
+            if case .error = newState, ownsRecordingSession, !isProcessingNotes {
+                releaseRecordingSession()
             }
         }
         // Sync local chip selection with Settings changes while still in the setup
@@ -694,8 +715,11 @@ struct RecordingView: View {
 
     private var recordingReadiness: (canStart: Bool, help: String) {
         // Engines are shared app-wide — a second window must not start a
-        // concurrent recording over the live one.
-        if appState.isRecording { return (false, "A recording is already in progress") }
+        // concurrent recording over a live one, nor over a stopped one whose
+        // finalization is still consuming the engine.
+        if appState.isRecording || transcriptionEngine.isSessionActive {
+            return (false, "A recording is already in progress")
+        }
         if let err = transcriptionEngine.errorMessage { return (false, err) }
         if let err = diarizationEngine.errorMessage { return (false, err) }
         if !transcriptionEngine.isModelLoaded { return (false, "Loading transcription model...") }
@@ -845,9 +869,27 @@ struct RecordingView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
+    /// Undo startRecording()'s optimistic claims after the recording can no
+    /// longer complete (capture error, or view teardown before the pipeline).
+    private func releaseRecordingSession() {
+        timer?.invalidate()
+        timer = nil
+        appState.isRecording = false
+        appState.isPaused = false
+        transcriptionEngine.endSession()
+        ownsRecordingSession = false
+    }
+
     private func startRecording() {
-        guard !appState.isRecording else { return }
-        transcriptionEngine.reset()
+        guard !appState.isRecording, !transcriptionEngine.isSessionActive else { return }
+        // A failed attempt leaves the capture manager in .error, and its
+        // startRecording() silently no-ops unless .idle — reset it first so
+        // Retry actually retries instead of claiming flags over dead capture.
+        if case .error = captureManager.state {
+            _ = captureManager.stopRecording()
+        }
+        transcriptionEngine.beginSession()
+        ownsRecordingSession = true
 
         // Preserve any notes the user jotted down during the setup phase rather
         // than wiping them, and seed each non-empty line as a 0:00 entry. This
@@ -1030,6 +1072,10 @@ struct RecordingView: View {
             // Now in the post-recording (saved) state — let ContentView rebuild
             // this view fresh on the next "Record" instead of re-showing it.
             appState.recordingSaved = true
+            // The pipeline has consumed everything it needs from the engine —
+            // release it for the next recording (and for deferred model swaps).
+            transcriptionEngine.endSession()
+            ownsRecordingSession = false
         }
     }
 

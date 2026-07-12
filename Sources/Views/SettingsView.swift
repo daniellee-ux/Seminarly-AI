@@ -211,10 +211,10 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .onChange(of: transcriptionSettings.whisperModel) { _, newModel in
-                        // Don't swap the model out from under an active recording
-                        // or an in-flight finalization pass; the change then
-                        // applies on next launch as before.
-                        guard !appState.isRecording, !TranscriptionEngine.shared.isTranscribing else { return }
+                        // Don't swap the model out from under a recording session
+                        // (live or still finalizing); the engine also enforces
+                        // this, and the change then applies on next launch.
+                        guard !appState.isRecording, !TranscriptionEngine.shared.isSessionActive else { return }
                         Task { await TranscriptionEngine.shared.loadModel(name: newModel) }
                     }
 

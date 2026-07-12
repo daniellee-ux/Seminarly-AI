@@ -7,7 +7,7 @@ enum CaptureSource: Hashable, Sendable {
     case microphone
 }
 
-enum CaptureState: Sendable {
+enum CaptureState: Sendable, Equatable {
     case idle
     case recording
     case paused
