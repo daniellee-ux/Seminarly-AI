@@ -194,6 +194,11 @@ final class AudioCaptureManager: ObservableObject {
     private var refreshTimer: Timer?
     private(set) var recordingStartTime: Date?
 
+    // Capture start runs on a detached task (Core Audio setup blocks). A stop
+    // or abort issued while that task is in flight bumps this token, and the
+    // stale task's completion must not flip state or leave taps running.
+    private var captureGeneration = 0
+
     var onAudioSamples: (@Sendable ([Float]) -> Void)? {
         get { accumulator.onAudioSamples }
         set { accumulator.onAudioSamples = newValue }
@@ -249,6 +254,8 @@ final class AudioCaptureManager: ObservableObject {
         }
 
         // Move blocking Core Audio setup off the main thread
+        captureGeneration += 1
+        let generation = captureGeneration
         Task.detached(priority: .userInitiated) {
             // Start system audio tap
             if let process {
@@ -256,6 +263,7 @@ final class AudioCaptureManager: ObservableObject {
                     try tap.start(processObjectID: process.objectID)
                 } catch {
                     await MainActor.run {
+                        guard generation == self.captureGeneration else { return }
                         self.state = .error("System audio: \(error.localizedDescription)")
                     }
                     return
@@ -269,6 +277,7 @@ final class AudioCaptureManager: ObservableObject {
                 } catch {
                     tap.stop()
                     await MainActor.run {
+                        guard generation == self.captureGeneration else { return }
                         self.state = .error("Microphone: \(error.localizedDescription)")
                     }
                     return
@@ -276,6 +285,14 @@ final class AudioCaptureManager: ObservableObject {
             }
 
             await MainActor.run {
+                // A stop/abort superseded this start while Core Audio was
+                // setting up — kill the freshly started taps instead of
+                // resurrecting a capture nobody owns.
+                guard generation == self.captureGeneration else {
+                    tap.stop()
+                    mic.stop()
+                    return
+                }
                 self.state = .recording
 
                 // Periodically refresh process list
@@ -315,12 +332,15 @@ final class AudioCaptureManager: ObservableObject {
             acc.handleMicrophoneBuffer(buffer)
         }
 
+        captureGeneration += 1
+        let generation = captureGeneration
         Task.detached(priority: .userInitiated) {
             if let process {
                 do {
                     try tap.start(processObjectID: process.objectID)
                 } catch {
                     await MainActor.run {
+                        guard generation == self.captureGeneration else { return }
                         self.state = .error("Resume system audio: \(error.localizedDescription)")
                     }
                     return
@@ -333,6 +353,7 @@ final class AudioCaptureManager: ObservableObject {
                 } catch {
                     tap.stop()
                     await MainActor.run {
+                        guard generation == self.captureGeneration else { return }
                         self.state = .error("Resume microphone: \(error.localizedDescription)")
                     }
                     return
@@ -340,6 +361,12 @@ final class AudioCaptureManager: ObservableObject {
             }
 
             await MainActor.run {
+                // Superseded by a stop/abort while starting — see startRecording.
+                guard generation == self.captureGeneration else {
+                    tap.stop()
+                    mic.stop()
+                    return
+                }
                 self.state = .recording
                 self.refreshTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
                     Task { @MainActor in
@@ -360,11 +387,12 @@ final class AudioCaptureManager: ObservableObject {
     func stopRecording() -> RecordingResult {
         refreshTimer?.invalidate()
         refreshTimer = nil
-        // Only stop capture if not already paused (pause already stopped them)
-        if case .recording = state {
-            processTap.stop()
-            micCapture.stop()
-        }
+        // Stop unconditionally and bump the generation: a resume/start may
+        // still be inside its detached Core Audio setup, and this stop must
+        // win that race (stop on a not-started tap is a no-op).
+        captureGeneration += 1
+        processTap.stop()
+        micCapture.stop()
         state = .idle
 
         return RecordingResult(
@@ -372,6 +400,17 @@ final class AudioCaptureManager: ObservableObject {
             systemSamples: accumulator.systemSamples,
             micSamples: accumulator.micSamples
         )
+    }
+
+    /// Kill any live or in-flight-starting capture WITHOUT touching the
+    /// published state — used when a recording session is released after a
+    /// capture error, where resetting state would hide the error banner.
+    func abortCapture() {
+        captureGeneration += 1
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        processTap.stop()
+        micCapture.stop()
     }
 
     var recordingDuration: TimeInterval {

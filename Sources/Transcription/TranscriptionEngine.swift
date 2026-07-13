@@ -47,6 +47,9 @@ final class TranscriptionEngine: ObservableObject {
     // cancels the view's .task) cannot abort it; the next window joins it instead.
     private var loadTask: Task<Void, Never>?
     private var loadingModelName: String?
+    // Model switch requested while a recording session held the engine —
+    // applied by endSession() once the session releases it.
+    private var pendingModelName: String?
 
     func loadModel(name: String = TranscriptionSettings.defaultModel) async {
         if isModelLoaded && loadedModelName == name {
@@ -58,8 +61,12 @@ final class TranscriptionEngine: ObservableObject {
 
         // Never swap models while a recording session is using the engine — a
         // new window's .task or a Settings change must not tear the model out
-        // from under a live recording or its finalization.
-        if isSessionActive && isModelLoaded { return }
+        // from under a live recording or its finalization. Queue the request;
+        // endSession() applies it.
+        if isSessionActive && isModelLoaded {
+            pendingModelName = name
+            return
+        }
 
         // Join an in-flight load of the same model; supersede one of a different
         // model. Loop: by the time a superseded task drains, another caller may
@@ -94,8 +101,11 @@ final class TranscriptionEngine: ObservableObject {
     private func performLoad(name: String) async {
         // Re-check: a recording may have claimed the engine between loadModel's
         // guard and this task's first turn on the MainActor — never tear the
-        // model out from under it.
-        if isSessionActive && whisperKit != nil { return }
+        // model out from under it. Queue the swap for endSession() instead.
+        if isSessionActive && whisperKit != nil {
+            pendingModelName = name
+            return
+        }
 
         errorMessage = nil
         // Block new recordings during the swap, but keep the old instance alive
@@ -194,9 +204,16 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     /// Release the engine after the post-stop pipeline has consumed its output
-    /// (or after the recording view died mid-recording and no pipeline will run).
+    /// (or after the recording view died mid-recording and no pipeline will run),
+    /// then apply any model switch that was requested during the session.
     func endSession() {
         isSessionActive = false
+        if let pending = pendingModelName {
+            pendingModelName = nil
+            if pending != loadedModelName {
+                Task { await loadModel(name: pending) }
+            }
+        }
     }
 
     // MARK: - Local model cache

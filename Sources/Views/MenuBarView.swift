@@ -10,9 +10,7 @@ struct MenuBarView: View {
                 Button {
                     // Open main window to stop recording
                     NSApplication.shared.activate(ignoringOtherApps: true)
-                    if let window = NSApplication.shared.windows.first(where: { $0.title.contains("Seminarly") || $0.isKeyWindow }) {
-                        window.makeKeyAndOrderFront(nil)
-                    }
+                    openMainWindow()
                 } label: {
                     Label("Recording in progress...", systemImage: "record.circle.fill")
                         .foregroundStyle(SeminarlyColors.recording)

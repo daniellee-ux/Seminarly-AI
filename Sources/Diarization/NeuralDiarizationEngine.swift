@@ -91,6 +91,13 @@ final class NeuralDiarizationEngine: ObservableObject {
         do {
             modelStatus = "Downloading speaker diarization models..."
             try await diarizer.prepareModels()
+            // The files are on disk now — rebuild once through the purge-immune
+            // loader and share that set (manager included), so rediarize() and
+            // any later load can never re-enter the download/purge path.
+            if let models = try? await Self.loadModelsFromDisk() {
+                diarizer.initialize(models: models)
+                cachedModels = models
+            }
             isModelReady = true
             modelStatus = "Speaker models ready"
             logger.info("Models prepared successfully")

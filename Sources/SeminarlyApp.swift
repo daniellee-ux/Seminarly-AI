@@ -9,12 +9,6 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Data
 final class AppState {
     var isRecording = false
     var isPaused = false
-    /// True only while RecordingView is mounted in its post-recording (saved)
-    /// state, i.e. its `savedMeeting` is set. Lets ContentView tell a *finished*
-    /// recording (rebuild fresh on the next "Record") apart from a setup,
-    /// recording, or still-finalizing view (all of which must be preserved) —
-    /// none of which are distinguishable from `isRecording`/`isPaused` alone.
-    var recordingSaved = false
     var recordingElapsedTime: TimeInterval = 0
 }
 
@@ -31,15 +25,44 @@ final class DatabaseState {
     var hasError: Bool { error != nil }
 }
 
-/// Exists solely to force a WAL checkpoint when the app quits. SwiftUI's `scenePhase`
-/// does not reliably fire `.background` on macOS app termination, but
-/// `NSApplicationDelegate.applicationWillTerminate` does.
+/// Forces a WAL checkpoint when the app quits (SwiftUI's `scenePhase` does not
+/// reliably fire `.background` on macOS termination) and delays termination
+/// while a recording's finalize/save pipeline is still running — quitting
+/// mid-pipeline would silently discard the meeting before it ever reaches disk.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Path to the SwiftData store. We compute this from `FileManager` rather than
     /// `ModelConfiguration(...).url` because `ModelConfiguration` is `@MainActor`-isolated
     /// and this static needs to be reachable from nonisolated contexts (the raw SQLite
     /// checkpoint path).
     static let storeURL = DatabaseStore.storeURL
+
+    @MainActor private static var activeSavePipelines = 0
+    @MainActor private static var terminationPending = false
+
+    /// Bracket a finalize/save pipeline so Cmd+Q / menu-bar Quit waits for the
+    /// meeting to land in the store instead of killing it mid-flight.
+    @MainActor static func beginSavePipeline() {
+        activeSavePipelines += 1
+    }
+
+    @MainActor static func endSavePipeline() {
+        activeSavePipelines -= 1
+        if activeSavePipelines <= 0, terminationPending {
+            terminationPending = false
+            NSApplication.shared.reply(toApplicationShouldTerminate: true)
+        }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            if Self.activeSavePipelines > 0 {
+                logger.notice("Delaying termination: \(Self.activeSavePipelines, privacy: .public) recording save pipeline(s) in flight")
+                Self.terminationPending = true
+                return .terminateLater
+            }
+            return .terminateNow
+        }
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         let success = DatabaseCheckpoint.performCheckpoint(at: Self.storeURL, mode: .truncate)
