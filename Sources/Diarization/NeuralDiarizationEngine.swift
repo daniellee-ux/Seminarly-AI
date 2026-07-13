@@ -1,3 +1,4 @@
+import CoreML
 import Foundation
 import FluidAudio
 import os.log
@@ -55,11 +56,40 @@ final class NeuralDiarizationEngine: ObservableObject {
         }
     }
 
+    /// Models loaded once and shared with every diarizer instance (including
+    /// rediarize()'s temporary forced-speaker-count managers) via
+    /// `initialize(models:)` — CoreML models load once per app run, and an
+    /// initialized manager never re-enters FluidAudio's download path.
+    private var cachedModels: OfflineDiarizerModels?
+
     private func performPrepare() async {
         errorMessage = nil
         modelStatus = "Preparing speaker diarization models..."
         logger.info("Starting model preparation...")
+
+        // Purge-immune path: when the on-disk cache is complete, build the
+        // models with plain CoreML and inject them. FluidAudio's own loader
+        // (DownloadUtils.loadModels) deletes the entire cache on ANY load error
+        // and re-downloads from Hugging Face — which permanently bricks
+        // diarization for offline/blocked-network users — so it is reserved
+        // for the cache-missing case below.
+        var localModels: OfflineDiarizerModels?
         do {
+            localModels = try await Self.loadModelsFromDisk()
+        } catch {
+            logger.error("Local diarization model load failed: \(error.localizedDescription, privacy: .public) — falling back to FluidAudio loader")
+        }
+        if let localModels {
+            diarizer.initialize(models: localModels)
+            cachedModels = localModels
+            isModelReady = true
+            modelStatus = "Speaker models ready"
+            logger.info("Diarization models loaded from local cache")
+            return
+        }
+
+        do {
+            modelStatus = "Downloading speaker diarization models..."
             try await diarizer.prepareModels()
             isModelReady = true
             modelStatus = "Speaker models ready"
@@ -70,6 +100,77 @@ final class NeuralDiarizationEngine: ObservableObject {
             modelStatus = "Model loading failed"
             logger.error("Model preparation FAILED: \(error)")
         }
+    }
+
+    private struct DiarizerCacheError: LocalizedError {
+        let message: String
+        var errorDescription: String? { message }
+    }
+
+    /// Build the diarizer models directly from FluidAudio's on-disk cache with
+    /// plain CoreML, bypassing DownloadUtils entirely. Returns nil when any
+    /// required file is missing (fresh install → FluidAudio downloads them);
+    /// throws when files exist but fail to load. Mirrors the configurations of
+    /// OfflineDiarizerModels.load: computeUnits .all with low-precision GPU
+    /// accumulation, except FBank which is pinned to CPU.
+    nonisolated private static func loadModelsFromDisk() async throws -> OfflineDiarizerModels? {
+        let repoDir = OfflineDiarizerModels.defaultModelsDirectory()
+            .appendingPathComponent("speaker-diarization-coreml", isDirectory: true)
+        let fm = FileManager.default
+        let psiURL = repoDir.appendingPathComponent("plda-parameters.json")
+
+        func modelURL(_ name: String) -> URL {
+            repoDir.appendingPathComponent("\(name).mlmodelc", isDirectory: true)
+        }
+        let allPresent = ["Segmentation", "FBank", "Embedding", "PldaRho"]
+            .allSatisfy { fm.fileExists(atPath: modelURL($0).path) }
+            && fm.fileExists(atPath: psiURL.path)
+        guard allPresent else { return nil }
+
+        let mainConfig = MLModelConfiguration()
+        mainConfig.computeUnits = .all
+        mainConfig.allowLowPrecisionAccumulationOnGPU = true
+        let fbankConfig = MLModelConfiguration()
+        fbankConfig.computeUnits = .cpuOnly
+        fbankConfig.allowLowPrecisionAccumulationOnGPU = true
+
+        let start = Date()
+        let segmentation = try await MLModel.load(contentsOf: modelURL("Segmentation"), configuration: mainConfig)
+        let embedding = try await MLModel.load(contentsOf: modelURL("Embedding"), configuration: mainConfig)
+        let pldaRho = try await MLModel.load(contentsOf: modelURL("PldaRho"), configuration: mainConfig)
+        let fbank = try await MLModel.load(contentsOf: modelURL("FBank"), configuration: fbankConfig)
+        let psi = try loadPLDAPsi(from: psiURL)
+
+        return OfflineDiarizerModels(
+            segmentationModel: segmentation,
+            fbankModel: fbank,
+            embeddingModel: embedding,
+            pldaRhoModel: pldaRho,
+            pldaPsi: psi,
+            compilationDuration: Date().timeIntervalSince(start)
+        )
+    }
+
+    /// Parse the PLDA psi tensor from plda-parameters.json — the same format
+    /// FluidAudio reads (tensors.psi.data_base64 → little-endian Float32 array).
+    nonisolated private static func loadPLDAPsi(from url: URL) throws -> [Double] {
+        let data = try Data(contentsOf: url)
+        let json = try JSONSerialization.jsonObject(with: data)
+        guard let root = json as? [String: Any],
+              let tensors = root["tensors"] as? [String: Any],
+              let psiInfo = tensors["psi"] as? [String: Any],
+              let base64 = psiInfo["data_base64"] as? String,
+              let decoded = Data(base64Encoded: base64, options: [.ignoreUnknownCharacters])
+        else {
+            throw DiarizerCacheError(message: "Failed to decode PLDA psi parameters at \(url.path)")
+        }
+        let floatCount = decoded.count / MemoryLayout<Float>.size
+        guard floatCount > 0 else {
+            throw DiarizerCacheError(message: "PLDA psi tensor is empty at \(url.path)")
+        }
+        var floats = [Float](repeating: 0, count: floatCount)
+        _ = floats.withUnsafeMutableBytes { decoded.copyBytes(to: $0) }
+        return floats.map(Double.init)
     }
 
     /// Apply neural speaker labels to transcript segments.
@@ -306,7 +407,14 @@ final class NeuralDiarizationEngine: ObservableObject {
         let tempDiarizer = OfflineDiarizerManager(config: config)
 
         do {
-            try await tempDiarizer.prepareModels()
+            // Reuse the already-loaded models when available — injecting them
+            // skips a full CoreML reload AND keeps the temp manager out of
+            // FluidAudio's download/purge path entirely.
+            if let cachedModels {
+                tempDiarizer.initialize(models: cachedModels)
+            } else {
+                try await tempDiarizer.prepareModels()
+            }
             // Diarize on system audio only (same as diarize()) — avoids mic echo phantom clusters
             let allSamples = systemSamples
 

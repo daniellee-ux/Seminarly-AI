@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: Spacing.xxs) {
@@ -42,6 +43,7 @@ struct MenuBarView: View {
                 return
             }
         }
-        // If no window exists, the WindowGroup will create one
+        // No window left (user closed the last one) — create a fresh one.
+        openWindow(id: SeminarlyApp.mainWindowID)
     }
 }

@@ -119,8 +119,12 @@ struct SeminarlyApp: App {
         }
     }
 
+    /// Identifier of the main WindowGroup, so MenuBarView can openWindow(id:)
+    /// when the user asks for the window after closing the last one.
+    static let mainWindowID = "main"
+
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: SeminarlyApp.mainWindowID) {
             ContentView()
                 .tint(SeminarlyColors.accent)
                 .environment(databaseState)
