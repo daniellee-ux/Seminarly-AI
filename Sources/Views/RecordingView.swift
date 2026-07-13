@@ -67,6 +67,10 @@ struct RecordingView: View {
     // cleanup can't be skipped in those states (which would leak the app-wide
     // recording flags and the shared engine's session forever).
     @State private var ownsRecordingSession = false
+    // True once capture actually reached .recording for this attempt — a
+    // start-failure has elapsed-timer ticks but no audio, and must not be
+    // salvaged as an (empty) meeting.
+    @State private var captureDidStart = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -146,15 +150,21 @@ struct RecordingView: View {
             }
         }
         .onChange(of: captureManager.state) { _, newState in
+            if case .recording = newState {
+                captureDidStart = true
+            }
             // Capture failed to start (or died): isRecording/isPaused turn false
             // so the Stop button is unreachable, yet the flags set optimistically
             // in startRecording() would block every retry and model swap forever.
             // If real audio was captured (e.g. the device died mid-recording or
             // on resume), salvage it through the normal finalize/save pipeline —
             // same policy as a window closing mid-recording; otherwise release
-            // the session so the error banner's Retry can start over.
+            // the session so the error banner's Retry can start over. Gate on
+            // capture having actually reached .recording, not just wall-clock:
+            // the timer starts optimistically before Core Audio finishes its
+            // async setup, so a slow start-failure has ticks but zero samples.
             if case .error = newState, ownsRecordingSession, !isProcessingNotes {
-                if elapsedTime > 0 {
+                if captureDidStart && elapsedTime > 0 {
                     logger.notice("Capture error after \(Int(elapsedTime))s of recording — finalizing and saving the session")
                     stopRecording()
                 } else {
@@ -741,7 +751,12 @@ struct RecordingView: View {
         if appState.isRecording || transcriptionEngine.isSessionActive {
             return (false, "A recording is already in progress")
         }
-        if let err = transcriptionEngine.errorMessage { return (false, err) }
+        // A load error only blocks recording when no model is usable — after a
+        // failed switch the previous model is restored and keeps working; the
+        // error stays visible in the banner (with Retry) as information.
+        if let err = transcriptionEngine.errorMessage, !transcriptionEngine.isModelLoaded {
+            return (false, err)
+        }
         if let err = diarizationEngine.errorMessage { return (false, err) }
         if !transcriptionEngine.isModelLoaded { return (false, "Loading transcription model...") }
         if !diarizationEngine.isModelReady { return (false, "Loading speaker diarization models...") }
@@ -915,6 +930,7 @@ struct RecordingView: View {
         }
         transcriptionEngine.beginSession()
         ownsRecordingSession = true
+        captureDidStart = false
 
         // Preserve any notes the user jotted down during the setup phase rather
         // than wiping them, and seed each non-empty line as a 0:00 entry. This
