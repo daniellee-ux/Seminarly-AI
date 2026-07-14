@@ -198,6 +198,11 @@ final class AudioCaptureManager: ObservableObject {
     // or abort issued while that task is in flight bumps this token, and the
     // stale task's completion must not flip state or leave taps running.
     private var captureGeneration = 0
+    // The in-flight (or last) start task. Each new start awaits the previous
+    // one before touching the shared tap/mic: a superseded task's cleanup
+    // stops those instances, and it must finish before a retry restarts them —
+    // otherwise stale cleanup can kill the newer capture.
+    private var startTask: Task<Void, Never>?
 
     var onAudioSamples: (@Sendable ([Float]) -> Void)? {
         get { accumulator.onAudioSamples }
@@ -256,7 +261,13 @@ final class AudioCaptureManager: ObservableObject {
         // Move blocking Core Audio setup off the main thread
         captureGeneration += 1
         let generation = captureGeneration
-        Task.detached(priority: .userInitiated) {
+        let previousStart = startTask
+        startTask = Task.detached(priority: .userInitiated) {
+            // Serialize behind a superseded start still inside Core Audio
+            // setup: its guarded cleanup stops the same shared tap/mic and
+            // must land before this start brings them up.
+            await previousStart?.value
+
             // Start system audio tap
             if let process {
                 do {
@@ -334,7 +345,11 @@ final class AudioCaptureManager: ObservableObject {
 
         captureGeneration += 1
         let generation = captureGeneration
-        Task.detached(priority: .userInitiated) {
+        let previousStart = startTask
+        startTask = Task.detached(priority: .userInitiated) {
+            // Serialize behind a superseded start — see startRecording.
+            await previousStart?.value
+
             if let process {
                 do {
                     try tap.start(processObjectID: process.objectID)
