@@ -171,15 +171,16 @@ struct RecordingView: View {
             // Capture failed to start (or died): isRecording/isPaused turn false
             // so the Stop button is unreachable, yet the flags set optimistically
             // in startRecording() would block every retry and model swap forever.
-            // If real audio was captured (e.g. the device died mid-recording or
-            // on resume), salvage it through the normal finalize/save pipeline —
-            // same policy as a window closing mid-recording; otherwise release
-            // the session so the error banner's Retry can start over. Gate on
-            // capture having actually reached .recording, not just wall-clock:
-            // the timer starts optimistically before Core Audio finishes its
-            // async setup, so a slow start-failure has ticks but zero samples.
+            // If capture actually reached .recording, real samples were delivered
+            // — salvage them through the normal finalize/save pipeline (the same
+            // capture-started ⇒ salvage policy as window close and app quit),
+            // even inside the first second. Only a start that never produced
+            // audio releases the session so the error banner's Retry can start
+            // over. captureDidStart, not wall-clock: the timer starts before
+            // Core Audio finishes its async setup, so a slow start-failure has
+            // ticks but zero samples.
             if case .error = newState, ownsRecordingSession, !isProcessingNotes {
-                if captureDidStart && elapsedTime > 0 {
+                if captureDidStart {
                     logger.notice("Capture error after \(Int(elapsedTime))s of recording — finalizing and saving the session")
                     stopRecording()
                 } else {
