@@ -141,7 +141,10 @@ struct RecordingView: View {
             // forever. When the pipeline IS already running (isProcessingNotes),
             // it survives this view and releases the session itself.
             if ownsRecordingSession && !isProcessingNotes {
-                if (isRecording || isPaused) && elapsedTime > 0 {
+                // isRecording/isPaused prove capture actually started — salvage
+                // even inside the first second (the elapsed timer only ticks at
+                // 1s, and the user's setup notes are part of the saved session).
+                if isRecording || isPaused {
                     logger.notice("Window closed mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
                     stopRecording(viewWillPersist: false)
                 } else {
