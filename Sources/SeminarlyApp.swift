@@ -12,6 +12,13 @@ final class AppState {
     var recordingElapsedTime: TimeInterval = 0
 }
 
+extension Notification.Name {
+    /// Posted by AppDelegate when the user quits while a recording is active:
+    /// the live RecordingView stops and saves the session, and termination
+    /// completes once the save pipeline lands.
+    static let seminarlyStopRecordingForTermination = Notification.Name("ai.seminarly.stopRecordingForTermination")
+}
+
 @Observable
 final class DatabaseState {
     var error: DatabaseError?
@@ -47,10 +54,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor static func endSavePipeline() {
         activeSavePipelines -= 1
-        if activeSavePipelines <= 0, terminationPending {
-            terminationPending = false
-            NSApplication.shared.reply(toApplicationShouldTerminate: true)
-        }
+        resolveTerminationIfIdle()
+    }
+
+    /// Complete a deferred termination once nothing recording-related is left:
+    /// no save pipeline in flight and no active recording session.
+    @MainActor static func resolveTerminationIfIdle() {
+        guard terminationPending,
+              activeSavePipelines <= 0,
+              !TranscriptionEngine.shared.isSessionActive
+        else { return }
+        terminationPending = false
+        NSApplication.shared.reply(toApplicationShouldTerminate: true)
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -58,6 +73,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if Self.activeSavePipelines > 0 {
                 logger.notice("Delaying termination: \(Self.activeSavePipelines, privacy: .public) recording save pipeline(s) in flight")
                 Self.terminationPending = true
+                return .terminateLater
+            }
+            if TranscriptionEngine.shared.isSessionActive {
+                // A recording is live and no pipeline exists yet — quitting now
+                // would discard it. Ask the recording UI to stop and save
+                // (delivered synchronously; stopRecording registers its
+                // pipeline before this returns), then terminate when it lands.
+                logger.notice("Delaying termination: active recording session — stopping and saving first")
+                Self.terminationPending = true
+                NotificationCenter.default.post(name: .seminarlyStopRecordingForTermination, object: nil)
+                // Watchdog: if nothing picked the request up (no live recording
+                // view — shouldn't happen, but quit must never hang), give up
+                // waiting and terminate.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    MainActor.assumeIsolated {
+                        if Self.terminationPending, Self.activeSavePipelines <= 0 {
+                            logger.error("Termination watchdog fired — no save pipeline started; quitting anyway")
+                            Self.terminationPending = false
+                            NSApplication.shared.reply(toApplicationShouldTerminate: true)
+                        }
+                    }
+                }
                 return .terminateLater
             }
             return .terminateNow

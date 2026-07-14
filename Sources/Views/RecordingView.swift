@@ -152,6 +152,18 @@ struct RecordingView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .seminarlyStopRecordingForTermination)) { _ in
+            // The user quit while this recording is live: stop and save so
+            // termination (held by AppDelegate) can complete with the session
+            // preserved. Mirrors the window-close teardown policy.
+            guard ownsRecordingSession, !isProcessingNotes else { return }
+            if isRecording || isPaused {
+                logger.notice("App terminating mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
+                stopRecording(viewWillPersist: false)
+            } else {
+                releaseRecordingSession()
+            }
+        }
         .onChange(of: captureManager.state) { _, newState in
             if case .recording = newState {
                 captureDidStart = true
@@ -921,6 +933,9 @@ struct RecordingView: View {
         appState.isPaused = false
         transcriptionEngine.endSession()
         ownsRecordingSession = false
+        // If a quit is waiting on this session and no pipeline will run
+        // (nothing worth saving), let termination complete now.
+        AppDelegate.resolveTerminationIfIdle()
     }
 
     private func startRecording() {
