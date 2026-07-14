@@ -53,9 +53,13 @@ final class TranscriptionEngine: ObservableObject {
 
     func loadModel(name: String = TranscriptionSettings.defaultModel) async {
         if isModelLoaded && loadedModelName == name {
-            // A matching loaded model makes any prior load error stale — clear
-            // it so it can't keep the Record button disabled.
-            errorMessage = nil
+            // The latest request matches the loaded model — cancel any switch
+            // still queued from earlier in the session (A→B→A must end on A).
+            // Deliberately NOT clearing errorMessage here: a failed switch
+            // reverts the persisted selection, which re-enters this path, and
+            // the failure banner must survive that (it doesn't block recording;
+            // recordingReadiness only blocks when no model is loaded).
+            pendingModelName = nil
             return
         }
 
@@ -88,6 +92,8 @@ final class TranscriptionEngine: ObservableObject {
 
         if isModelLoaded && loadedModelName == name { return }
 
+        // This request is being served now — it supersedes any queued switch.
+        pendingModelName = nil
         loadingModelName = name
         let task = Task { await performLoad(name: name) }
         loadTask = task
@@ -166,11 +172,18 @@ final class TranscriptionEngine: ObservableObject {
             isDownloading = false
             // The old model is still alive (previousKit) — put it back so a
             // failed switch keeps working instead of stranding the user with
-            // no model at all.
+            // no model at all. Also roll back the persisted selection when it
+            // still names the failed model: otherwise the next launch retries
+            // the uninstalled model and blocks recording despite a working
+            // installed one. (Skipped when a newer request already changed the
+            // setting again — the guard below only matches this load's name.)
             if let previousKit {
                 whisperKit = previousKit
                 loadedModelName = previousName
                 isModelLoaded = true
+                if let previousName, TranscriptionSettings.shared.whisperModel == name {
+                    TranscriptionSettings.shared.whisperModel = previousName
+                }
             }
             // A superseded load (model switched mid-download) is not an error.
             if error is CancellationError || Task.isCancelled {
