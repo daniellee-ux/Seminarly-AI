@@ -398,12 +398,11 @@ struct MeetingDetailView: View {
                 rediarizeStatus = ""
             }
         } else if let audio = meeting.loadAudio() {
-            rediarizeStatus = "Loading models..."
+            rediarizeStatus = "Re-identifying speakers..."
             Task {
-                let engine = NeuralDiarizationEngine()
-                await engine.prepareModels()
-                rediarizeStatus = "Re-identifying speakers..."
-                let newSegments = await engine.rediarize(
+                // rediarize() prepares its own forced-speaker-count diarizer;
+                // preparing a throwaway engine here loaded the models twice.
+                let newSegments = await NeuralDiarizationEngine.shared.rediarize(
                     segments: transcript.segments,
                     systemSamples: audio.system,
                     micSamples: audio.mic,

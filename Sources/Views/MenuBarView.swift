@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MenuBarView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: Spacing.xxs) {
@@ -9,9 +10,7 @@ struct MenuBarView: View {
                 Button {
                     // Open main window to stop recording
                     NSApplication.shared.activate(ignoringOtherApps: true)
-                    if let window = NSApplication.shared.windows.first(where: { $0.title.contains("Seminarly") || $0.isKeyWindow }) {
-                        window.makeKeyAndOrderFront(nil)
-                    }
+                    openMainWindow()
                 } label: {
                     Label("Recording in progress...", systemImage: "record.circle.fill")
                         .foregroundStyle(SeminarlyColors.recording)
@@ -42,6 +41,7 @@ struct MenuBarView: View {
                 return
             }
         }
-        // If no window exists, the WindowGroup will create one
+        // No window left (user closed the last one) — create a fresh one.
+        openWindow(id: SeminarlyApp.mainWindowID)
     }
 }

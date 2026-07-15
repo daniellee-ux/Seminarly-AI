@@ -11,6 +11,10 @@ struct ContentView: View {
     // Bumped every time a *new* recording is started, to re-key RecordingView so
     // SwiftUI rebuilds it fresh (see presentRecording()).
     @State private var recordingSessionID = 0
+    // True while THIS window's RecordingView sits in its post-recording (saved)
+    // state. Per-window (not on the shared AppState) so another window's
+    // RecordingView lifecycle can't clobber it.
+    @State private var recordingSaved = false
     @State private var showingSettings = false
     @State private var searchText = ""
     @State private var showDeleteConfirmation = false
@@ -26,8 +30,10 @@ struct ContentView: View {
     @State private var cliOfferConfirmation: String?
     @State private var cliOfferError: String?
 
-    @StateObject private var transcriptionEngine = TranscriptionEngine()
-    @StateObject private var diarizationEngine = NeuralDiarizationEngine()
+    // Shared app-lifetime engines: a new window (close/reopen, Cmd+N) reuses the
+    // already-loaded models instead of re-downloading and re-loading them.
+    @ObservedObject private var transcriptionEngine = TranscriptionEngine.shared
+    @ObservedObject private var diarizationEngine = NeuralDiarizationEngine.shared
     @StateObject private var audioMonitor = AudioSourceMonitor()
     @StateObject private var updateChecker = UpdateChecker.shared
 
@@ -207,8 +213,13 @@ struct ContentView: View {
             }
         }
         .task {
-            await transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
-            await diarizationEngine.prepareModels()
+            // Load both models concurrently — a slow (or hung) transcription
+            // download must not block diarization prep, and vice versa. The
+            // engines own their load tasks, so repeat calls from a reopened
+            // window join the in-flight work or no-op when already loaded.
+            async let transcription: Void = transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
+            async let diarization: Void = diarizationEngine.prepareModels()
+            _ = await (transcription, diarization)
             audioMonitor.startMonitoring()
         }
         .task {
@@ -323,6 +334,7 @@ struct ContentView: View {
                     selectedMeeting: $selectedMeeting,
                     transcriptionEngine: transcriptionEngine,
                     diarizationEngine: diarizationEngine,
+                    recordingSaved: $recordingSaved,
                     audioMonitor: audioMonitor,
                     preSelectedProcess: preSelectedProcess,
                     isVisible: viewingRecording,
@@ -437,13 +449,13 @@ struct ContentView: View {
     /// so SwiftUI rebuilds it from scratch; otherwise the stale "Recording saved"
     /// screen would just be re-revealed instead of a new recording.
     ///
-    /// We re-key *only* in that saved state (`appState.recordingSaved`). A setup
-    /// view (unsaved notes/chip selections), an active capture, and a stopped
-    /// session still finalizing on its background Task (which shares
+    /// We re-key *only* in that saved state (this window's `recordingSaved`).
+    /// A setup view (unsaved notes/chip selections), an active capture, and a
+    /// stopped session still finalizing on its background Task (which shares
     /// transcriptionEngine) are all left mounted and merely re-revealed, never
     /// torn down mid-flight.
     private func presentRecording() {
-        if appState.recordingSaved {
+        if recordingSaved {
             recordingSessionID += 1
         }
         showingRecording = true

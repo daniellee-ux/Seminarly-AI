@@ -12,6 +12,12 @@ struct RecordingView: View {
     @StateObject private var captureManager = AudioCaptureManager()
     @ObservedObject var transcriptionEngine: TranscriptionEngine
     @ObservedObject var diarizationEngine: NeuralDiarizationEngine
+
+    /// True while this view sits in its post-recording (saved) state, i.e.
+    /// `savedMeeting` is set. Owned per-window by ContentView (which re-keys a
+    /// *finished* recording on the next "Record") — a global flag here would let
+    /// one window's teardown clobber another window's saved-screen state.
+    @Binding var recordingSaved: Bool
     @ObservedObject private var enhancement = EnhancementCoordinator.shared
     @ObservedObject private var templateSettings = TemplateSettings.shared
     @ObservedObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
@@ -53,6 +59,18 @@ struct RecordingView: View {
 
     // Post-recording lifecycle state (set after stopRecording saves the meeting)
     @State private var savedMeeting: Meeting?
+
+    // True from Record-click until this view's recording session is released
+    // (saved, failed, or torn down). Unlike isRecording/isPaused — which derive
+    // from captureManager.state and are false both before capture actually
+    // starts and after a capture error — this tracks session OWNERSHIP, so
+    // cleanup can't be skipped in those states (which would leak the app-wide
+    // recording flags and the shared engine's session forever).
+    @State private var ownsRecordingSession = false
+    // True once capture actually reached .recording for this attempt — a
+    // start-failure has elapsed-timer ticks but no audio, and must not be
+    // salvaged as an (empty) meeting.
+    @State private var captureDidStart = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -97,8 +115,13 @@ struct RecordingView: View {
         .task {
             // A freshly built view starts in setup (savedMeeting == nil), so it's
             // not a saved recording until stopRecording() finishes.
-            appState.recordingSaved = false
-            transcriptionEngine.reset()
+            recordingSaved = false
+            // The engine is shared app-wide: a setup view opening in another
+            // window must not wipe a recording that is live elsewhere or a
+            // stopped one whose finalization is still consuming the engine.
+            if !appState.isRecording && !transcriptionEngine.isSessionActive {
+                transcriptionEngine.reset()
+            }
             captureManager.refreshProcessList()
             if let preSelectedProcess {
                 captureManager.selectedProcess = preSelectedProcess
@@ -107,7 +130,63 @@ struct RecordingView: View {
         .onDisappear {
             // This instance is leaving the hierarchy (dismissed or rebuilt), so
             // no saved recording is mounted anymore.
-            appState.recordingSaved = false
+            recordingSaved = false
+            // If the view is torn down while it owns a session whose pipeline
+            // hasn't started (window closed mid-recording, mid-start, or after a
+            // capture error), its captureManager dies with it and no pipeline
+            // would run. Salvage a real recording by stopping capture and running
+            // the normal finalize/save pipeline (its Task outlives this view);
+            // otherwise just clear the app-wide flags and release the engine so
+            // the menu bar and other windows don't report a phantom recording
+            // forever. When the pipeline IS already running (isProcessingNotes),
+            // it survives this view and releases the session itself.
+            if ownsRecordingSession && !isProcessingNotes {
+                // isRecording/isPaused prove capture actually started — salvage
+                // even inside the first second (the elapsed timer only ticks at
+                // 1s, and the user's setup notes are part of the saved session).
+                if isRecording || isPaused {
+                    logger.notice("Window closed mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
+                    stopRecording(viewWillPersist: false)
+                } else {
+                    releaseRecordingSession()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .seminarlyStopRecordingForTermination)) { _ in
+            // The user quit while this recording is live: stop and save so
+            // termination (held by AppDelegate) can complete with the session
+            // preserved. Mirrors the window-close teardown policy.
+            guard ownsRecordingSession, !isProcessingNotes else { return }
+            if isRecording || isPaused {
+                logger.notice("App terminating mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
+                stopRecording(viewWillPersist: false)
+            } else {
+                releaseRecordingSession()
+            }
+        }
+        .onChange(of: captureManager.state) { _, newState in
+            if case .recording = newState {
+                captureDidStart = true
+            }
+            // Capture failed to start (or died): isRecording/isPaused turn false
+            // so the Stop button is unreachable, yet the flags set optimistically
+            // in startRecording() would block every retry and model swap forever.
+            // If capture actually reached .recording, real samples were delivered
+            // — salvage them through the normal finalize/save pipeline (the same
+            // capture-started ⇒ salvage policy as window close and app quit),
+            // even inside the first second. Only a start that never produced
+            // audio releases the session so the error banner's Retry can start
+            // over. captureDidStart, not wall-clock: the timer starts before
+            // Core Audio finishes its async setup, so a slow start-failure has
+            // ticks but zero samples.
+            if case .error = newState, ownsRecordingSession, !isProcessingNotes {
+                if captureDidStart {
+                    logger.notice("Capture error after \(Int(elapsedTime))s of recording — finalizing and saving the session")
+                    stopRecording()
+                } else {
+                    releaseRecordingSession()
+                }
+            }
         }
         // Sync local chip selection with Settings changes while still in the setup
         // phase. RecordingView is kept alive behind an opacity layer when the user
@@ -682,7 +761,18 @@ struct RecordingView: View {
     }
 
     private var recordingReadiness: (canStart: Bool, help: String) {
-        if let err = transcriptionEngine.errorMessage { return (false, err) }
+        // Engines are shared app-wide — a second window must not start a
+        // concurrent recording over a live one, nor over a stopped one whose
+        // finalization is still consuming the engine.
+        if appState.isRecording || transcriptionEngine.isSessionActive {
+            return (false, "A recording is already in progress")
+        }
+        // A load error only blocks recording when no model is usable — after a
+        // failed switch the previous model is restored and keeps working; the
+        // error stays visible in the banner (with Retry) as information.
+        if let err = transcriptionEngine.errorMessage, !transcriptionEngine.isModelLoaded {
+            return (false, err)
+        }
         if let err = diarizationEngine.errorMessage { return (false, err) }
         if !transcriptionEngine.isModelLoaded { return (false, "Loading transcription model...") }
         if !diarizationEngine.isModelReady { return (false, "Loading speaker diarization models...") }
@@ -831,8 +921,35 @@ struct RecordingView: View {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
+    /// Undo startRecording()'s optimistic claims after the recording can no
+    /// longer complete (capture error, or view teardown before the pipeline).
+    private func releaseRecordingSession() {
+        // Kill live taps AND any capture start still inside its detached Core
+        // Audio setup — otherwise a torn-down view can leave capture running
+        // headless. Deliberately state-preserving so an .error stays visible.
+        captureManager.abortCapture()
+        timer?.invalidate()
+        timer = nil
+        appState.isRecording = false
+        appState.isPaused = false
+        transcriptionEngine.endSession()
+        ownsRecordingSession = false
+        // If a quit is waiting on this session and no pipeline will run
+        // (nothing worth saving), let termination complete now.
+        AppDelegate.resolveTerminationIfIdle()
+    }
+
     private func startRecording() {
-        transcriptionEngine.reset()
+        guard !appState.isRecording, !transcriptionEngine.isSessionActive else { return }
+        // A failed attempt leaves the capture manager in .error, and its
+        // startRecording() silently no-ops unless .idle — reset it first so
+        // Retry actually retries instead of claiming flags over dead capture.
+        if case .error = captureManager.state {
+            _ = captureManager.stopRecording()
+        }
+        transcriptionEngine.beginSession()
+        ownsRecordingSession = true
+        captureDidStart = false
 
         // Preserve any notes the user jotted down during the setup phase rather
         // than wiping them, and seed each non-empty line as a 0:00 entry. This
@@ -907,7 +1024,12 @@ struct RecordingView: View {
         }
     }
 
-    private func stopRecording() {
+    /// Stop capture and run the finalize/diarize/save pipeline. Pass
+    /// `viewWillPersist: false` when this view is being torn down (window
+    /// closed mid-recording): the pipeline Task still completes and saves the
+    /// meeting, but skips the UI-state writes that only make sense for a
+    /// still-mounted view (saved screen, sidebar selection, re-key flag).
+    private func stopRecording(viewWillPersist: Bool = true) {
         // Accumulate any final paused duration
         if let pauseStart = pauseStartTime {
             pausedDuration += Date().timeIntervalSince(pauseStart)
@@ -916,6 +1038,7 @@ struct RecordingView: View {
         timer?.invalidate()
         timer = nil
         appState.isRecording = false
+        appState.isPaused = false
 
         let recording = captureManager.stopRecording()
         let duration = captureManager.recordingDuration - pausedDuration
@@ -924,7 +1047,13 @@ struct RecordingView: View {
 
         isProcessingNotes = true
 
+        // Quitting must wait for this pipeline: the recording exists only in
+        // memory until modelContext.save() below.
+        AppDelegate.beginSavePipeline()
+
         Task {
+            defer { AppDelegate.endSavePipeline() }
+
             // 1. Finalize transcription
             processingStatus = "Finalizing transcription..."
             let segments = await transcriptionEngine.finalizeTranscription()
@@ -1005,16 +1134,22 @@ struct RecordingView: View {
             let ok = DatabaseCheckpoint.performCheckpoint(at: AppDelegate.storeURL, mode: .passive)
             logger.notice("End-of-recording checkpoint success=\(ok, privacy: .public)")
 
-            // Select the just-saved meeting so the sidebar reflects what's in the
-            // detail pane — without this, the previously-selected meeting (if any)
-            // stays highlighted until the user clicks Done.
-            selectedMeeting = meeting
+            if viewWillPersist {
+                // Select the just-saved meeting so the sidebar reflects what's in
+                // the detail pane — without this, the previously-selected meeting
+                // (if any) stays highlighted until the user clicks Done.
+                selectedMeeting = meeting
 
-            isProcessingNotes = false
-            savedMeeting = meeting
-            // Now in the post-recording (saved) state — let ContentView rebuild
-            // this view fresh on the next "Record" instead of re-showing it.
-            appState.recordingSaved = true
+                isProcessingNotes = false
+                savedMeeting = meeting
+                // Now in the post-recording (saved) state — let ContentView rebuild
+                // this view fresh on the next "Record" instead of re-showing it.
+                recordingSaved = true
+            }
+            // The pipeline has consumed everything it needs from the engine —
+            // release it for the next recording (and for deferred model swaps).
+            transcriptionEngine.endSession()
+            ownsRecordingSession = false
         }
     }
 

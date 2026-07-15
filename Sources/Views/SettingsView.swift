@@ -209,8 +209,14 @@ struct SettingsView: View {
                         }
                     }
                     .pickerStyle(.menu)
+                    .onChange(of: transcriptionSettings.whisperModel) { _, newModel in
+                        // The engine defers the swap while a recording session
+                        // (live or still finalizing) holds it, and applies the
+                        // queued switch when the session ends.
+                        Task { await TranscriptionEngine.shared.loadModel(name: newModel) }
+                    }
 
-                    Text("Takes effect on next app launch. Turbo is recommended (fastest, latest). Models are cached after first download.")
+                    Text("Switches now (downloads first if needed); if a recording is running, applies when it finishes. Turbo is recommended (fastest, latest). Models are cached after first download.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

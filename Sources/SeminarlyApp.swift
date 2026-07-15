@@ -9,13 +9,14 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Data
 final class AppState {
     var isRecording = false
     var isPaused = false
-    /// True only while RecordingView is mounted in its post-recording (saved)
-    /// state, i.e. its `savedMeeting` is set. Lets ContentView tell a *finished*
-    /// recording (rebuild fresh on the next "Record") apart from a setup,
-    /// recording, or still-finalizing view (all of which must be preserved) —
-    /// none of which are distinguishable from `isRecording`/`isPaused` alone.
-    var recordingSaved = false
     var recordingElapsedTime: TimeInterval = 0
+}
+
+extension Notification.Name {
+    /// Posted by AppDelegate when the user quits while a recording is active:
+    /// the live RecordingView stops and saves the session, and termination
+    /// completes once the save pipeline lands.
+    static let seminarlyStopRecordingForTermination = Notification.Name("ai.seminarly.stopRecordingForTermination")
 }
 
 @Observable
@@ -31,15 +32,74 @@ final class DatabaseState {
     var hasError: Bool { error != nil }
 }
 
-/// Exists solely to force a WAL checkpoint when the app quits. SwiftUI's `scenePhase`
-/// does not reliably fire `.background` on macOS app termination, but
-/// `NSApplicationDelegate.applicationWillTerminate` does.
+/// Forces a WAL checkpoint when the app quits (SwiftUI's `scenePhase` does not
+/// reliably fire `.background` on macOS termination) and delays termination
+/// while a recording's finalize/save pipeline is still running — quitting
+/// mid-pipeline would silently discard the meeting before it ever reaches disk.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Path to the SwiftData store. We compute this from `FileManager` rather than
     /// `ModelConfiguration(...).url` because `ModelConfiguration` is `@MainActor`-isolated
     /// and this static needs to be reachable from nonisolated contexts (the raw SQLite
     /// checkpoint path).
     static let storeURL = DatabaseStore.storeURL
+
+    @MainActor private static var activeSavePipelines = 0
+    @MainActor private static var terminationPending = false
+
+    /// Bracket a finalize/save pipeline so Cmd+Q / menu-bar Quit waits for the
+    /// meeting to land in the store instead of killing it mid-flight.
+    @MainActor static func beginSavePipeline() {
+        activeSavePipelines += 1
+    }
+
+    @MainActor static func endSavePipeline() {
+        activeSavePipelines -= 1
+        resolveTerminationIfIdle()
+    }
+
+    /// Complete a deferred termination once nothing recording-related is left:
+    /// no save pipeline in flight and no active recording session.
+    @MainActor static func resolveTerminationIfIdle() {
+        guard terminationPending,
+              activeSavePipelines <= 0,
+              !TranscriptionEngine.shared.isSessionActive
+        else { return }
+        terminationPending = false
+        NSApplication.shared.reply(toApplicationShouldTerminate: true)
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        MainActor.assumeIsolated {
+            if Self.activeSavePipelines > 0 {
+                logger.notice("Delaying termination: \(Self.activeSavePipelines, privacy: .public) recording save pipeline(s) in flight")
+                Self.terminationPending = true
+                return .terminateLater
+            }
+            if TranscriptionEngine.shared.isSessionActive {
+                // A recording is live and no pipeline exists yet — quitting now
+                // would discard it. Ask the recording UI to stop and save
+                // (delivered synchronously; stopRecording registers its
+                // pipeline before this returns), then terminate when it lands.
+                logger.notice("Delaying termination: active recording session — stopping and saving first")
+                Self.terminationPending = true
+                NotificationCenter.default.post(name: .seminarlyStopRecordingForTermination, object: nil)
+                // Watchdog: if nothing picked the request up (no live recording
+                // view — shouldn't happen, but quit must never hang), give up
+                // waiting and terminate.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+                    MainActor.assumeIsolated {
+                        if Self.terminationPending, Self.activeSavePipelines <= 0 {
+                            logger.error("Termination watchdog fired — no save pipeline started; quitting anyway")
+                            Self.terminationPending = false
+                            NSApplication.shared.reply(toApplicationShouldTerminate: true)
+                        }
+                    }
+                }
+                return .terminateLater
+            }
+            return .terminateNow
+        }
+    }
 
     func applicationWillTerminate(_ notification: Notification) {
         let success = DatabaseCheckpoint.performCheckpoint(at: Self.storeURL, mode: .truncate)
@@ -119,8 +179,12 @@ struct SeminarlyApp: App {
         }
     }
 
+    /// Identifier of the main WindowGroup, so MenuBarView can openWindow(id:)
+    /// when the user asks for the window after closing the last one.
+    static let mainWindowID = "main"
+
     var body: some Scene {
-        WindowGroup {
+        WindowGroup(id: SeminarlyApp.mainWindowID) {
             ContentView()
                 .tint(SeminarlyColors.accent)
                 .environment(databaseState)
