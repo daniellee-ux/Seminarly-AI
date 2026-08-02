@@ -790,9 +790,15 @@ struct RecordingView: View {
             errorBanner(message) { startRecording() }
             Divider()
         } else if let error = transcriptionEngine.errorMessage {
-            errorBanner(error) {
-                transcriptionEngine.errorMessage = nil
-                Task { await transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel) }
+            errorBanner(
+                error,
+                actionTitle: transcriptionEngine.canRetryModelLoad ? "Retry" : "Dismiss"
+            ) {
+                if transcriptionEngine.canRetryModelLoad {
+                    Task { await transcriptionEngine.retryModelLoad() }
+                } else {
+                    transcriptionEngine.clearFailure()
+                }
             }
             Divider()
         } else if let error = diarizationEngine.errorMessage {
@@ -807,7 +813,11 @@ struct RecordingView: View {
         }
     }
 
-    private func errorBanner(_ message: String, retry: @escaping () -> Void) -> some View {
+    private func errorBanner(
+        _ message: String,
+        actionTitle: String = "Retry",
+        action: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: Spacing.xs) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 11))
@@ -815,7 +825,7 @@ struct RecordingView: View {
                 .font(Typography.caption)
                 .lineLimit(1)
             Spacer()
-            Button("Retry", action: retry)
+            Button(actionTitle, action: action)
                 .buttonStyle(.plain)
                 .font(Typography.captionMedium)
                 .foregroundStyle(SeminarlyColors.accent)
