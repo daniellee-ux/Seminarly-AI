@@ -3,7 +3,8 @@
 # package-app.sh — produce a distributable, notarized Seminarly.dmg.
 #
 # Pipeline: xcodegen → archive (Release, hardened runtime, Developer ID) →
-# export signed .app → build .dmg (drag-to-Applications) → notarize → staple → verify.
+# export signed .app → build + Developer-ID sign .dmg (drag-to-Applications) →
+# notarize → staple → verify.
 #
 # The archive also builds + embeds the bundled `seminarly-cli` (a target dependency
 # of the app) into Contents/Helpers, code-signed with hardened runtime alongside the
@@ -146,6 +147,12 @@ rm -f "$DMG_PATH"
   -D app="$PWD/$APP_PATH" -D bg="$PWD/scripts/dmg-assets/background.png" \
   "$APP_NAME" "$DMG_PATH"
 
+note "Signing DMG with Developer ID"
+# Notarization alone does not give the disk image a usable primary signature.
+# The DMG was freshly created above, so fail rather than replace a signature.
+codesign --sign "$SIGN_ID" --timestamp "$DMG_PATH"
+codesign --verify --strict --verbose=2 "$DMG_PATH"
+
 note "Notarizing (a few minutes — Apple inspects the app inside)"
 if [ "$USE_API_KEY" = true ]; then
   xcrun notarytool submit "$DMG_PATH" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
@@ -158,8 +165,10 @@ xcrun stapler staple "$DMG_PATH"
 
 note "Verifying"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-spctl --assess --type open --context context:primary-signature -v "$DMG_PATH" || true
+codesign --verify --strict --verbose=2 "$DMG_PATH"
 xcrun stapler validate "$DMG_PATH"
+spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH"
+hdiutil verify "$DMG_PATH"
 
 SIZE=$(du -h "$DMG_PATH" | cut -f1)
 note "Done → $DMG_PATH ($SIZE)"
