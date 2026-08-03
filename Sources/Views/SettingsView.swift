@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var saveStatus: String?
     @State private var modelDraft: String = ""
     @State private var modelSaveStatus: String?
+    @State private var modelLoadTask: Task<Void, Never>?
     @StateObject private var transcriptionSettings = TranscriptionSettings.shared
     @StateObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @StateObject private var updateSettings = UpdateSettings.shared
@@ -212,11 +213,17 @@ struct SettingsView: View {
                     .onChange(of: transcriptionSettings.whisperModel) { _, newModel in
                         // The engine defers the swap while a recording session
                         // (live or still finalizing) holds it, and applies the
-                        // queued switch when the session ends.
-                        Task { await TranscriptionEngine.shared.loadModel(name: newModel) }
+                        // queued switch when the session ends. Cancel a picker
+                        // request that has not reached the engine yet so rapid
+                        // A→B→C changes remain latest-selection-wins.
+                        modelLoadTask?.cancel()
+                        modelLoadTask = Task { @MainActor in
+                            guard !Task.isCancelled else { return }
+                            await TranscriptionEngine.shared.loadModel(name: newModel)
+                        }
                     }
 
-                    Text("Switches now (downloads first if needed); if a recording is running, applies when it finishes. Turbo is recommended (fastest, latest). Models are cached after first download.")
+                    Text("Installed models load from this Mac. Seminarly downloads only when the selected model is missing or incomplete. Loading after relaunch can take a few minutes; changes made during a recording apply after it is saved.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

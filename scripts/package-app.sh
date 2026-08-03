@@ -3,7 +3,8 @@
 # package-app.sh — produce a distributable, notarized Seminarly.dmg.
 #
 # Pipeline: xcodegen → archive (Release, hardened runtime, Developer ID) →
-# export signed .app → build .dmg (drag-to-Applications) → notarize → staple → verify.
+# export signed .app → build + Developer-ID sign .dmg (drag-to-Applications) →
+# notarize → staple → verify.
 #
 # The archive also builds + embeds the bundled `seminarly-cli` (a target dependency
 # of the app) into Contents/Helpers, code-signed with hardened runtime alongside the
@@ -26,17 +27,31 @@ set -euo pipefail
 
 # Always run from the repo root (this script lives in <root>/scripts/).
 cd "$(dirname "$0")/.."
+# shellcheck source=lib/signing-identity.sh
+source scripts/lib/signing-identity.sh
 
 SCHEME="Seminarly"
 PROJECT="Seminarly.xcodeproj"
 CONFIG="Release"
 APP_NAME="Seminarly"
-SIGN_ID="Developer ID Application"
+SIGN_ID_NAME="Developer ID Application"
 NOTARY_PROFILE="${NOTARY_PROFILE:-seminarly-notary}"
+
+# Capture once, then resolve both the team and the exact identity from the same
+# snapshot. Piping `security` into an early-exiting grep can SIGPIPE the writer;
+# under pipefail that turns a successful match into an intermittent failure.
+if ! IDENTITIES="$(LC_ALL=C security find-identity -v -p codesigning 2>/dev/null)"; then
+  echo "✗ Could not query code-signing identities from the keychain." >&2
+  exit 1
+fi
 
 # Team ID: $DEVELOPMENT_TEAM if set, else auto-detected from your Developer ID cert
 # (nothing hardcoded — bring your own signing identity).
-TEAM_ID="${DEVELOPMENT_TEAM:-$(security find-identity -v -p codesigning | grep -m1 "$SIGN_ID" | grep -oE '\([A-Z0-9]{10}\)' | tail -1 | tr -d '()')}"
+if [ -n "${DEVELOPMENT_TEAM:-}" ]; then
+  TEAM_ID="$DEVELOPMENT_TEAM"
+elif ! TEAM_ID="$(resolve_developer_id_application_team "$IDENTITIES")"; then
+  exit 1
+fi
 
 # --- notary auth: App Store Connect API key (headless), else keychain profile ----
 # Honour explicit env vars first; otherwise auto-discover from the `asc` CLI store.
@@ -76,14 +91,11 @@ OPTS_PLIST="$BUILD_DIR/ExportOptions.plist"
 note() { printf "\n▸ %s\n" "$*"; }
 
 # --- preflight ---------------------------------------------------------------
-# Capture first, then match: piping into `grep -q` lets grep close the pipe on
-# the first match, which SIGPIPE-kills the writer; under `pipefail` that turns a
-# successful match into a non-zero pipeline (an intermittent false negative).
-IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
-if ! grep -q "$SIGN_ID" <<<"$IDENTITIES"; then
-  echo "✗ No '$SIGN_ID' certificate in the keychain. Create one in Xcode → Settings → Accounts → Manage Certificates." >&2
+if ! SIGN_CERT_HASH="$(resolve_developer_id_application_hash "$TEAM_ID" "$IDENTITIES")"; then
+  echo "  Create or remove certificates in Xcode → Settings → Accounts → Manage Certificates." >&2
   exit 1
 fi
+echo "▸ Signing identity: $SIGN_ID_NAME (Team $TEAM_ID, exact certificate selected)"
 if [ "$USE_API_KEY" = true ]; then
   echo "▸ Notary auth: App Store Connect API key ($NOTARY_KEY_ID, headless)"
 elif xcrun notarytool history --keychain-profile "$NOTARY_PROFILE" >/dev/null 2>&1; then
@@ -103,7 +115,7 @@ rm -rf "$BUILD_DIR"; mkdir -p "$BUILD_DIR"
 xcodebuild archive \
   -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
   -archivePath "$ARCHIVE" -destination 'generic/platform=macOS' \
-  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_ID" DEVELOPMENT_TEAM="$TEAM_ID" \
+  CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_CERT_HASH" DEVELOPMENT_TEAM="$TEAM_ID" \
   ENABLE_HARDENED_RUNTIME=YES -quiet
 
 note "Exporting signed .app"
@@ -114,7 +126,7 @@ cat > "$OPTS_PLIST" <<PLIST
   <key>method</key><string>developer-id</string>
   <key>teamID</key><string>$TEAM_ID</string>
   <key>signingStyle</key><string>manual</string>
-  <key>signingCertificate</key><string>$SIGN_ID</string>
+  <key>signingCertificate</key><string>$SIGN_CERT_HASH</string>
 </dict></plist>
 PLIST
 xcodebuild -exportArchive -archivePath "$ARCHIVE" \
@@ -146,6 +158,14 @@ rm -f "$DMG_PATH"
   -D app="$PWD/$APP_PATH" -D bg="$PWD/scripts/dmg-assets/background.png" \
   "$APP_NAME" "$DMG_PATH"
 
+note "Signing DMG with Developer ID"
+# Notarization alone does not give the disk image a usable primary signature.
+# The DMG was freshly created above, so fail rather than replace a signature.
+# Use the preflight-resolved hash: standalone codesign does not consult TEAM_ID,
+# and a partial common name fails when more than one certificate matches.
+codesign --sign "$SIGN_CERT_HASH" --timestamp "$DMG_PATH"
+codesign --verify --strict --verbose=2 "$DMG_PATH"
+
 note "Notarizing (a few minutes — Apple inspects the app inside)"
 if [ "$USE_API_KEY" = true ]; then
   xcrun notarytool submit "$DMG_PATH" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
@@ -158,8 +178,10 @@ xcrun stapler staple "$DMG_PATH"
 
 note "Verifying"
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-spctl --assess --type open --context context:primary-signature -v "$DMG_PATH" || true
+codesign --verify --strict --verbose=2 "$DMG_PATH"
 xcrun stapler validate "$DMG_PATH"
+spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH"
+hdiutil verify "$DMG_PATH"
 
 SIZE=$(du -h "$DMG_PATH" | cut -f1)
 note "Done → $DMG_PATH ($SIZE)"

@@ -6,6 +6,18 @@ private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Tran
 
 @MainActor
 final class TranscriptionEngine: ObservableObject {
+    enum Failure: Equatable {
+        case modelLoad(String)
+        case transcription(String)
+
+        var message: String {
+            switch self {
+            case .modelLoad(let message), .transcription(let message):
+                return message
+            }
+        }
+    }
+
     /// App-lifetime instance. The engine must outlive any single window: models
     /// take seconds to load, so closing and reopening a window must never throw
     /// a loaded model away.
@@ -18,8 +30,16 @@ final class TranscriptionEngine: ObservableObject {
     @Published var loadingProgress: String = ""
     @Published var downloadFraction: Double = 0
     @Published var isDownloading = false
-    @Published var errorMessage: String?
+    @Published var failure: Failure?
     @Published var detectedLanguage: String?
+
+    var errorMessage: String? { failure?.message }
+
+    var canRetryModelLoad: Bool {
+        guard !isModelLoaded else { return false }
+        if case .some(.modelLoad(_)) = failure { return true }
+        return false
+    }
 
     /// When set (e.g. "en", "zh"), forces WhisperKit to transcribe in this language.
     /// When nil, WhisperKit auto-detects per chunk.
@@ -47,55 +67,100 @@ final class TranscriptionEngine: ObservableObject {
     // cancels the view's .task) cannot abort it; the next window joins it instead.
     private var loadTask: Task<Void, Never>?
     private var loadingModelName: String?
+    // Guards published state against delayed download callbacks and Core ML
+    // initializers that return after their load was superseded. Core ML model
+    // loading is not cooperatively cancellable inside WhisperKit 0.18.
+    private var loadGeneration = 0
     // Model switch requested while a recording session held the engine —
     // applied by endSession() once the session releases it.
     private var pendingModelName: String?
+    // Records user intent when a request enters the engine. A deferred switch
+    // must not become "latest" merely because its unstructured task happens to
+    // run after a newer picker request.
+    private var desiredModelName: String?
 
     func loadModel(name: String = TranscriptionSettings.defaultModel) async {
-        if isModelLoaded && loadedModelName == name {
-            // The latest request matches the loaded model — cancel any switch
-            // still queued from earlier in the session (A→B→A must end on A).
-            // Deliberately NOT clearing errorMessage here: a failed switch
-            // reverts the persisted selection, which re-enters this path, and
-            // the failure banner must survive that (it doesn't block recording;
-            // recordingReadiness only blocks when no model is loaded).
-            pendingModelName = nil
+        // Settings cancels superseded picker requests before they reach this
+        // actor. A cancelled caller must not clear a newer pending selection or
+        // start its own replacement after waiting for an older load to drain.
+        guard !Task.isCancelled else { return }
+        desiredModelName = name
+        await loadDesiredModel(name: name)
+    }
+
+    private func loadDesiredModel(name: String) async {
+        // The wrapper above can yield when entering this async function. If a
+        // newer request got the actor first, this older request is already stale.
+        guard !Task.isCancelled, desiredModelName == name else { return }
+
+        // Same-model callers join the engine-owned task without invalidating it.
+        if let inFlight = loadTask,
+           loadingModelName == name,
+           !inFlight.isCancelled
+        {
+            await inFlight.value
             return
         }
 
-        // Never swap models while a recording session is using the engine — a
-        // new window's .task or a Settings change must not tear the model out
-        // from under a live recording or its finalization. Queue the request;
-        // endSession() applies it.
-        if isSessionActive && isModelLoaded {
-            pendingModelName = name
-            return
-        }
-
-        // Join an in-flight load of the same model; supersede one of a different
-        // model. Loop: by the time a superseded task drains, another caller may
-        // have started a new one.
-        while let inFlight = loadTask {
-            // A cancelled task is already superseded — never join it (its result
-            // will be discarded); fall through to drain and restart.
-            if loadingModelName == name, !inFlight.isCancelled {
-                await inFlight.value
+        // Fast paths are safe only when no different engine task is queued. If
+        // one exists but has not begun performLoad yet, the latest selection must
+        // still invalidate and drain it before returning or queueing a session
+        // switch; otherwise that stale task could commit after this return.
+        if loadTask == nil {
+            if isModelLoaded && loadedModelName == name {
+                // The latest request matches the loaded model — cancel any switch
+                // still queued from earlier in the session (A→B→A must end on A).
+                // Deliberately NOT clearing failure here: a failed switch
+                // reverts the persisted selection, which re-enters this path, and
+                // the failure banner must survive that (it doesn't block recording;
+                // recordingReadiness only blocks when no model is loaded).
+                pendingModelName = nil
                 return
             }
+
+            // Never swap models while a recording session is using the engine —
+            // queue the latest request for endSession().
+            if isSessionActive && isModelLoaded {
+                pendingModelName = name
+                return
+            }
+        }
+
+        // Claim latest-request identity before awaiting a non-cooperatively
+        // cancellable Core ML load. This immediately invalidates the old task's
+        // delayed progress callbacks; a still-newer request invalidates this one
+        // while it waits for the old task to drain.
+        loadGeneration &+= 1
+        let generation = loadGeneration
+        clearModelLoadStatus(generation: generation)
+
+        // Supersede an in-flight load of a different model. Loop because a newer
+        // request may start another task while this caller is suspended.
+        while let inFlight = loadTask {
+            guard generation == loadGeneration, !Task.isCancelled else { return }
             inFlight.cancel()
             await inFlight.value
             if loadTask == inFlight {
                 loadTask = nil
                 loadingModelName = nil
             }
+            guard generation == loadGeneration, !Task.isCancelled else { return }
         }
 
-        if isModelLoaded && loadedModelName == name { return }
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+        if isModelLoaded && loadedModelName == name {
+            pendingModelName = nil
+            return
+        }
+        if isSessionActive && isModelLoaded {
+            pendingModelName = name
+            return
+        }
 
         // This request is being served now — it supersedes any queued switch.
         pendingModelName = nil
         loadingModelName = name
-        let task = Task { await performLoad(name: name) }
+        let task = Task { await performLoad(name: name, generation: generation) }
         loadTask = task
         await task.value
         if loadTask == task {
@@ -104,7 +169,9 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    private func performLoad(name: String) async {
+    private func performLoad(name: String, generation: Int) async {
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+
         // Re-check: a recording may have claimed the engine between loadModel's
         // guard and this task's first turn on the MainActor — never tear the
         // model out from under it. Queue the swap for endSession() instead.
@@ -113,7 +180,8 @@ final class TranscriptionEngine: ObservableObject {
             return
         }
 
-        errorMessage = nil
+        failure = nil
+        clearModelLoadStatus(generation: generation)
         // Block new recordings during the swap, but keep the old instance alive
         // until the replacement has loaded — a failed switch must not strand
         // the user with no model at all. Cost: both models are transiently
@@ -132,9 +200,11 @@ final class TranscriptionEngine: ObservableObject {
             if let localFolder = Self.installedModelFolder(for: name) {
                 do {
                     try Task.checkCancellation()
-                    loadingProgress = "Preparing transcription model..."
-                    try await loadWhisperKit(from: localFolder, name: name)
-                    logger.notice("Loaded \(name, privacy: .public) from local cache")
+                    loadingProgress = "Loading the installed transcription model..."
+                    let startedAt = Date()
+                    try await loadWhisperKit(from: localFolder, name: name, generation: generation)
+                    let elapsed = String(format: "%.1f", Date().timeIntervalSince(startedAt))
+                    logger.notice("Loaded \(name, privacy: .public) from local cache in \(elapsed, privacy: .public)s")
                     return
                 } catch is CancellationError {
                     throw CancellationError()
@@ -155,21 +225,28 @@ final class TranscriptionEngine: ObservableObject {
             ) { @Sendable [weak self] progress in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    self.downloadFraction = progress.fractionCompleted
-                    let pct = Int(progress.fractionCompleted * 100)
+                    guard self.loadGeneration == generation,
+                          self.loadingModelName == name,
+                          self.isDownloading
+                    else { return }
+                    let fraction = min(max(progress.fractionCompleted, 0), 1)
+                    self.downloadFraction = max(self.downloadFraction, fraction)
+                    let pct = Int(self.downloadFraction * 100)
                     self.loadingProgress = "Downloading \(name)... \(pct)%"
                 }
             }
             isDownloading = false
             try Task.checkCancellation()
+            guard generation == loadGeneration else { throw CancellationError() }
 
             // Step 2: Load model from downloaded folder
-            loadingProgress = "Preparing transcription model..."
-            try await loadWhisperKit(from: modelFolder, name: name)
-            logger.notice("Loaded \(name, privacy: .public) after download")
+            loadingProgress = "Download complete. Loading the transcription model..."
+            let startedAt = Date()
+            try await loadWhisperKit(from: modelFolder, name: name, generation: generation)
+            let elapsed = String(format: "%.1f", Date().timeIntervalSince(startedAt))
+            logger.notice("Loaded \(name, privacy: .public) after download in \(elapsed, privacy: .public)s")
         } catch {
-            loadingProgress = ""
-            isDownloading = false
+            clearModelLoadStatus(generation: generation)
             // The old model is still alive (previousKit) — put it back so a
             // failed switch keeps working instead of stranding the user with
             // no model at all. Also roll back the persisted selection when it
@@ -181,30 +258,51 @@ final class TranscriptionEngine: ObservableObject {
                 whisperKit = previousKit
                 loadedModelName = previousName
                 isModelLoaded = true
-                if let previousName, TranscriptionSettings.shared.whisperModel == name {
-                    TranscriptionSettings.shared.whisperModel = previousName
-                }
             }
-            // A superseded load (model switched mid-download) is not an error.
-            if error is CancellationError || Task.isCancelled {
+            // A superseded load may restore its in-memory fallback so the next
+            // request can snapshot it, but it must never roll back the latest
+            // persisted selection or publish an error.
+            let superseded = generation != loadGeneration
+                || error is CancellationError
+                || Task.isCancelled
+            if superseded {
                 logger.notice("Load of \(name, privacy: .public) cancelled")
                 return
             }
+            if let previousName, previousKit != nil,
+               TranscriptionSettings.shared.whisperModel == name
+            {
+                TranscriptionSettings.shared.whisperModel = previousName
+            }
             logger.error("Failed to load model \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
-            errorMessage = "Failed to load model: \(error.localizedDescription)"
+            failure = .modelLoad("Failed to load model: \(error.localizedDescription)")
         }
     }
 
-    private func loadWhisperKit(from folder: URL, name: String) async throws {
-        whisperKit = try await WhisperKit(
+    private func loadWhisperKit(from folder: URL, name: String, generation: Int) async throws {
+        let candidate = try await WhisperKit(
             modelFolder: folder.path,
             verbose: false,
             logLevel: .none,
             download: false
         )
+        // WhisperKit/Core ML may finish normally after Task.cancel(). Only the
+        // latest generation may publish its model or clear the current status.
+        try Task.checkCancellation()
+        guard generation == loadGeneration, loadingModelName == name else {
+            throw CancellationError()
+        }
+        whisperKit = candidate
         loadedModelName = name
         isModelLoaded = true
+        clearModelLoadStatus(generation: generation)
+    }
+
+    private func clearModelLoadStatus(generation: Int) {
+        guard generation == loadGeneration else { return }
         loadingProgress = ""
+        downloadFraction = 0
+        isDownloading = false
     }
 
     // MARK: - Recording session lifecycle
@@ -213,7 +311,27 @@ final class TranscriptionEngine: ObservableObject {
     /// resets/model swaps from other windows until `endSession()`.
     func beginSession() {
         reset()
+        // A failed model switch may leave a non-blocking warning while the old
+        // model remains usable. Starting a recording accepts that fallback and
+        // begins the session with a clean banner. A blocking initial-load error
+        // is preserved defensively; normal UI readiness never calls this path.
+        if isModelLoaded, case .some(.modelLoad(_)) = failure {
+            failure = nil
+        }
         isSessionActive = true
+    }
+
+    func clearFailure() {
+        failure = nil
+    }
+
+    func retryModelLoad() async {
+        guard canRetryModelLoad else {
+            clearFailure()
+            return
+        }
+        failure = nil
+        await loadModel(name: TranscriptionSettings.shared.whisperModel)
     }
 
     /// Release the engine after the post-stop pipeline has consumed its output
@@ -224,9 +342,25 @@ final class TranscriptionEngine: ObservableObject {
         if let pending = pendingModelName {
             pendingModelName = nil
             if pending != loadedModelName {
-                Task { await loadModel(name: pending) }
+                Task { [weak self] in
+                    await self?.resumeDeferredModelLoad(name: pending)
+                }
             }
         }
+    }
+
+    private func resumeDeferredModelLoad(name: String) async {
+        // The persisted selection changes synchronously when the picker changes,
+        // potentially before its new Task reaches this actor. Check both sources
+        // of intent so an old endSession task can never supersede that selection.
+        guard !Task.isCancelled,
+              desiredModelName == name,
+              TranscriptionSettings.shared.whisperModel == name
+        else {
+            logger.notice("Discarded stale deferred model load for \(name, privacy: .public)")
+            return
+        }
+        await loadDesiredModel(name: name)
     }
 
     // MARK: - Local model cache
@@ -246,15 +380,21 @@ final class TranscriptionEngine: ObservableObject {
     /// A partial download that slips past this check still fails the WhisperKit
     /// init, which then falls back to the download path.
     nonisolated static func installedModelFolder(for variant: String) -> URL? {
-        let fm = FileManager.default
         guard let base = modelCacheBase else { return nil }
-        let folder = base.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(variant)")
+        return installedModelFolder(for: variant, cacheBase: base)
+    }
+
+    /// Testable form of the local fast-path predicate. The app wrapper above
+    /// supplies its pinned cache root; tests supply an isolated temporary root.
+    nonisolated static func installedModelFolder(for variant: String, cacheBase: URL) -> URL? {
+        let fm = FileManager.default
+        let folder = cacheBase.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(variant)")
         // WhisperKit requires exactly these three compiled bundles; the prefill
         // bundle and the *.json files are optional.
         for bundle in ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc"] {
             guard fm.fileExists(atPath: folder.appendingPathComponent(bundle).path) else { return nil }
         }
-        guard isTokenizerCached(for: variant) else { return nil }
+        guard isTokenizerCached(for: variant, cacheBase: cacheBase) else { return nil }
         return folder
     }
 
@@ -263,6 +403,11 @@ final class TranscriptionEngine: ObservableObject {
     /// Both files must exist locally for a fully-offline load; this mirrors
     /// WhisperKit's variant→tokenizer mapping for the variants Seminarly offers.
     nonisolated static func isTokenizerCached(for variant: String) -> Bool {
+        guard let base = modelCacheBase else { return false }
+        return isTokenizerCached(for: variant, cacheBase: base)
+    }
+
+    nonisolated static func isTokenizerCached(for variant: String, cacheBase: URL) -> Bool {
         let repo: String
         if variant.contains("large-v3") {
             repo = "openai/whisper-large-v3"
@@ -276,8 +421,7 @@ final class TranscriptionEngine: ObservableObject {
             return false // unknown variant — use the download path
         }
         let fm = FileManager.default
-        guard let base = modelCacheBase else { return false }
-        let dir = base.appendingPathComponent("models/\(repo)")
+        let dir = cacheBase.appendingPathComponent("models/\(repo)")
         return ["tokenizer.json", "tokenizer_config.json"].allSatisfy {
             fm.fileExists(atPath: dir.appendingPathComponent($0).path)
         }
@@ -344,7 +488,7 @@ final class TranscriptionEngine: ObservableObject {
                 }
             }
         } catch {
-            errorMessage = "Transcription error: \(error.localizedDescription)"
+            failure = .transcription("Transcription error: \(error.localizedDescription)")
         }
     }
 
@@ -381,7 +525,11 @@ final class TranscriptionEngine: ObservableObject {
         segments = []
         liveText = ""
         isTranscribing = false
-        errorMessage = nil
+        // Setup views must preserve model-load failures so Error/Retry remains
+        // visible. Only runtime transcription failures belong to the old session.
+        if case .some(.transcription(_)) = failure {
+            failure = nil
+        }
         detectedLanguage = nil
         hasDetectedLanguage = false
         selectedLanguage = nil
