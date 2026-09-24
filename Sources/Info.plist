@@ -24,5 +24,21 @@
     <string>Seminarly captures audio from apps for transcription.</string>
     <key>LSUIElement</key>
     <false/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/appcast-arm64.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>D16p6TtgWshIqv/H2S83UfJIheJ5ofFGEMz4ddrwGE0=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
+    <key>SUAllowsAutomaticUpdates</key>
+    <false/>
+    <key>SUSendProfileInfo</key>
+    <false/>
+    <key>SUVerifyUpdateBeforeExtraction</key>
+    <true/>
+    <key>SURequireSignedFeed</key>
+    <true/>
 </dict>
 </plist>

@@ -6,7 +6,9 @@ import os.path
 application = defines["app"]
 appname = os.path.basename(application)
 
-format = "UDZO"                       # compressed, read-only
+# LZMA disk images are supported since macOS 10.15, older than our 14.4 minimum.
+# Measured substantially smaller than zlib/UDZO for the bundled ChatGPT runtime.
+format = "ULMO"                       # LZMA-compressed, read-only
 files = [application]
 symlinks = {"Applications": "/Applications"}
 

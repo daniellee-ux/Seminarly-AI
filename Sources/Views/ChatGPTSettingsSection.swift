@@ -8,7 +8,7 @@ struct ChatGPTSettingsSection: View {
 
     var body: some View {
         Section("ChatGPT · Beta") {
-            Text("Sign in with your ChatGPT account to generate notes. No API key or extra installation needed.")
+            Text("Sign in with your ChatGPT account to generate notes. No API key or manual installation needed. A connection component downloads once on first use.")
                 .font(.caption).foregroundStyle(.secondary)
 
             if let identity = account.account {
@@ -57,14 +57,23 @@ struct ChatGPTSettingsSection: View {
             }
             if account.isWorking {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(account.pendingLogin == nil ? "Connecting to ChatGPT…" : "Waiting for sign-in…")
+                    if case .downloading(let fraction) = account.preparation {
+                        ProgressView(value: fraction).frame(width: 80)
+                        Text(fraction, format: .percent.precision(.fractionLength(0)))
+                            .font(.caption.monospacedDigit())
+                    } else {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(account.preparation?.message ?? (account.pendingLogin == nil ? "Connecting to ChatGPT…" : "Waiting for sign-in…"))
                         .font(.caption).foregroundStyle(.secondary)
                     if account.pendingLogin == nil && !account.isConnected {
                         Button("Cancel") { account.cancelSignIn() }
                     }
                 }
-                if account.pendingLogin == nil {
+                if account.preparation != nil {
+                    Text("This is only needed the first time, or when the connection component changes. You can cancel and try again later.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else if account.pendingLogin == nil {
                     Text("If macOS asks, allow access to your saved ChatGPT sign-in.")
                         .font(.caption).foregroundStyle(.secondary)
                 }

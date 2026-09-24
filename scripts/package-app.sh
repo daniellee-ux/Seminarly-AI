@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# package-app.sh — produce a distributable, notarized Seminarly.dmg.
+# package-app.sh — produce native, compressed, notarized Seminarly installers.
 #
 # Pipeline: xcodegen → archive (Release, hardened runtime, Developer ID) →
 # export signed .app → build + Developer-ID sign .dmg (drag-to-Applications) →
@@ -10,7 +10,9 @@
 # of the app) into Contents/Helpers, code-signed with hardened runtime alongside the
 # app — so it is notarized for free. No separate CLI build step is needed.
 #
-# Run from the repo root:  ./scripts/package-app.sh
+# Run from the repo root: ./scripts/package-app.sh [--arch arm64|x86_64|universal|all]
+# Default: both native installers plus Seminarly.dmg for older update clients.
+# Each invocation uses a fresh output directory; prior releases are never removed.
 #
 # Prerequisites (one-time):
 #   1. A "Developer ID Application" certificate in your login keychain.
@@ -29,6 +31,28 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 # shellcheck source=lib/signing-identity.sh
 source scripts/lib/signing-identity.sh
+source scripts/lib/package-architecture.sh
+
+PACKAGE_TARGET=all
+if [ "$#" -eq 1 ] && [ "$1" = --runtime-only ]; then
+  PACKAGE_TARGET=runtime
+elif [ "$#" -eq 1 ] && { [ "$1" = --help ] || [ "$1" = -h ]; }; then
+  echo 'Usage: scripts/package-app.sh [--arch arm64|x86_64|universal|all]'
+  echo 'Default: native Apple Silicon + Intel installers, and a universal legacy update asset.'
+  echo 'Use --runtime-only with CHATGPT_RUNTIME_RELEASE_TAG to prepare signed first-use components.'
+  exit 0
+elif [ "$#" -eq 2 ] && [ "$1" = --arch ]; then
+  PACKAGE_TARGET="$2"
+elif [ "$#" -ne 0 ]; then
+  echo 'Usage: scripts/package-app.sh [--arch arm64|x86_64|universal|all]' >&2
+  exit 1
+fi
+case "$PACKAGE_TARGET" in
+  runtime) PACKAGE_VARIANTS=() ;;
+  all) PACKAGE_VARIANTS=(arm64 x86_64 universal) ;;
+  arm64|x86_64|universal) PACKAGE_VARIANTS=("$PACKAGE_TARGET") ;;
+  *) echo "Unsupported package architecture: $PACKAGE_TARGET" >&2; exit 1 ;;
+esac
 
 SCHEME="Seminarly"
 PROJECT="Seminarly.xcodeproj"
@@ -81,13 +105,6 @@ else
   USE_API_KEY=false
 fi
 
-BUILD_DIR="build/dist"
-ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
-EXPORT_DIR="$BUILD_DIR/export"
-APP_PATH="$EXPORT_DIR/$APP_NAME.app"
-DMG_PATH="$BUILD_DIR/$APP_NAME.dmg"
-OPTS_PLIST="$BUILD_DIR/ExportOptions.plist"
-
 note() { printf "\n▸ %s\n" "$*"; }
 
 # --- preflight ---------------------------------------------------------------
@@ -110,28 +127,73 @@ fi
 note "Regenerating Xcode project"
 xcodegen generate
 
-note "Archiving ($CONFIG, hardened runtime, Developer ID)"
-rm -rf "$BUILD_DIR"; mkdir -p "$BUILD_DIR"
+mkdir -p build/packages
+PACKAGE_OUTPUT="$(mktemp -d "$PWD/build/packages/release.XXXXXX")"
+PACKAGE_ARTIFACTS=()
+
+notarize_path() {
+  if [ "$USE_API_KEY" = true ]; then
+    xcrun notarytool submit "$1" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
+  else
+    xcrun notarytool submit "$1" --keychain-profile "$NOTARY_PROFILE" --wait
+  fi
+}
+
+if [ "$PACKAGE_TARGET" = runtime ]; then
+  source scripts/lib/package-chatgpt-runtime.sh
+  package_chatgpt_runtime "$PACKAGE_OUTPUT" "${CHATGPT_RUNTIME_RELEASE_TAG:?Set the future release tag, e.g. v0.1.12}" "$TEAM_ID" "$SIGN_CERT_HASH"
+  exit 0
+fi
+
+source scripts/lib/sparkle-tools.sh
+resolve_sparkle_tools
+export SPARKLE_BIN
+# Fail before expensive builds if this machine cannot sign updates for this app.
+SPARKLE_PUBLIC_KEY="$("$SPARKLE_BIN/generate_keys" --account "${SPARKLE_ACCOUNT:-ai.seminarly.updates}" -p)"
+[ "$SPARKLE_PUBLIC_KEY" = "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' Sources/Info.plist)" ] || {
+  echo 'Sparkle signing key does not match Sources/Info.plist.' >&2; exit 1;
+}
+# Stage pinned optional downloads alongside the installers. For the first release
+# supply CHATGPT_COMPONENT_DIR from --runtime-only; later releases can fetch the
+# exact immutable assets already published. Never silently re-sign/re-pin them.
+python3 scripts/stage-runtime-assets.py Sources/Resources/ChatGPTRuntime.json "$PACKAGE_OUTPUT" "${CHATGPT_COMPONENT_DIR:-}"
+
+DMGVENV="$PWD/.dmgvenv"
+if [ ! -x "$DMGVENV/bin/dmgbuild" ]; then
+  python3 -m venv "$DMGVENV"
+  "$DMGVENV/bin/pip" install --quiet --upgrade pip dmgbuild pillow
+fi
+
+package_variant() {
+local variant="$1" archs
+archs="$(package_architectures "$variant")"
+local BUILD_DIR="$PACKAGE_OUTPUT/$variant"
+local ARCHIVE="$BUILD_DIR/$APP_NAME.xcarchive"
+local EXPORT_DIR="$BUILD_DIR/export"
+local APP_PATH="$EXPORT_DIR/$APP_NAME.app"
+local DMG_PATH="$PACKAGE_OUTPUT/$(package_dmg_name "$variant")"
+local OPTS_PLIST="$BUILD_DIR/ExportOptions.plist"
+local HELPER HELPER_SIG CHATGPT_HELPER CHATGPT_SIG CHATGPT_NOTICE
+
+note "Archiving $variant ($CONFIG, hardened runtime, Developer ID)"
+mkdir -p "$BUILD_DIR"
 xcodebuild archive \
   -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIG" \
   -archivePath "$ARCHIVE" -destination 'generic/platform=macOS' \
+  ARCHS="$archs" ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="$SIGN_CERT_HASH" DEVELOPMENT_TEAM="$TEAM_ID" \
   ENABLE_HARDENED_RUNTIME=YES -quiet
 
 note "Exporting signed .app"
-cat > "$OPTS_PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>method</key><string>developer-id</string>
-  <key>teamID</key><string>$TEAM_ID</string>
-  <key>signingStyle</key><string>manual</string>
-  <key>signingCertificate</key><string>$SIGN_CERT_HASH</string>
-</dict></plist>
-PLIST
+plutil -create xml1 "$OPTS_PLIST"
+plutil -insert method -string developer-id "$OPTS_PLIST"
+plutil -insert teamID -string "$TEAM_ID" "$OPTS_PLIST"
+plutil -insert signingStyle -string manual "$OPTS_PLIST"
+plutil -insert signingCertificate -string "$SIGN_CERT_HASH" "$OPTS_PLIST"
 xcodebuild -exportArchive -archivePath "$ARCHIVE" \
   -exportPath "$EXPORT_DIR" -exportOptionsPlist "$OPTS_PLIST" -quiet
 
+package_verify_architectures "$APP_PATH/Contents/MacOS/$APP_NAME" "$variant"
 note "Verifying embedded seminarly-cli (present + hardened, fail fast before notarizing)"
 HELPER="$APP_PATH/Contents/Helpers/seminarly-cli"
 if [ ! -x "$HELPER" ]; then
@@ -145,37 +207,27 @@ if ! grep -q 'flags=.*runtime' <<<"$HELPER_SIG"; then
   exit 1
 fi
 codesign --verify --strict "$HELPER"
+package_verify_architectures "$HELPER" "$variant"
 echo "  ✓ Contents/Helpers/seminarly-cli — Developer ID, hardened, valid"
 
-note "Verifying bundled ChatGPT connection component"
+note "Verifying small base app and pinned ChatGPT manifest"
 CHATGPT_HELPER="$APP_PATH/Contents/Helpers/seminarly-chatgpt"
-if [ ! -x "$CHATGPT_HELPER" ]; then
-  echo "✗ ChatGPT connection component missing. Check the embed build phase." >&2
+[ ! -e "$CHATGPT_HELPER" ] || {
+  echo 'Legacy ChatGPT runtime unexpectedly remains inside base app.' >&2; exit 1;
+}
+if ! cmp -s Sources/Resources/ChatGPTRuntime.json "$APP_PATH/Contents/Resources/ChatGPTRuntime.json"; then
+  echo 'ChatGPT manifest does not match the source pins.' >&2
   exit 1
 fi
-CHATGPT_SIG="$(codesign -dv --verbose=4 "$CHATGPT_HELPER" 2>&1)"
-if [[ "$CHATGPT_SIG" != *"runtime"* ]] || [[ "$CHATGPT_SIG" != *"TeamIdentifier=$TEAM_ID"* ]]; then
-  echo "✗ ChatGPT connection component is not hardened and signed by the app publisher." >&2
-  exit 1
-fi
-codesign --verify --strict --all-architectures "$CHATGPT_HELPER"
-for CHATGPT_ARCH in $(lipo -archs "$APP_PATH/Contents/MacOS/$APP_NAME"); do
-  lipo "$CHATGPT_HELPER" -verify_arch "$CHATGPT_ARCH"
-done
 for CHATGPT_NOTICE in LICENSE NOTICE ORIGIN.txt; do
   test -s "$APP_PATH/Contents/Resources/ThirdParty/OpenAICodex/$CHATGPT_NOTICE"
 done
-echo "  ✓ ChatGPT component — app architectures, Developer ID, hardened, notices present"
+codesign --verify --deep --strict "$APP_PATH/Contents/Frameworks/Sparkle.framework"
+echo '  ✓ Optional ChatGPT runtime pins, attribution, and Sparkle framework present'
 
 note "Building styled DMG (dmgbuild — headless, no Finder/AppleScript)"
-DMGVENV="$PWD/.dmgvenv"
-if [ ! -x "$DMGVENV/bin/dmgbuild" ]; then
-  python3 -m venv "$DMGVENV"
-  "$DMGVENV/bin/pip" install --quiet --upgrade pip dmgbuild pillow
-fi
-rm -f "$DMG_PATH"
 "$DMGVENV/bin/dmgbuild" -s scripts/dmg-settings.py \
-  -D app="$PWD/$APP_PATH" -D bg="$PWD/scripts/dmg-assets/background.png" \
+  -D app="$APP_PATH" -D bg="$PWD/scripts/dmg-assets/background.png" \
   "$APP_NAME" "$DMG_PATH"
 
 note "Signing DMG with Developer ID"
@@ -187,11 +239,7 @@ codesign --sign "$SIGN_CERT_HASH" --timestamp "$DMG_PATH"
 codesign --verify --strict --verbose=2 "$DMG_PATH"
 
 note "Notarizing (a few minutes — Apple inspects the app inside)"
-if [ "$USE_API_KEY" = true ]; then
-  xcrun notarytool submit "$DMG_PATH" --key "$NOTARY_KEY" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER" --wait
-else
-  xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait
-fi
+notarize_path "$DMG_PATH"
 
 note "Stapling the ticket"
 xcrun stapler staple "$DMG_PATH"
@@ -203,6 +251,19 @@ xcrun stapler validate "$DMG_PATH"
 spctl --assess --type open --context context:primary-signature -vv "$DMG_PATH"
 hdiutil verify "$DMG_PATH"
 
-SIZE=$(du -h "$DMG_PATH" | cut -f1)
-note "Done → $DMG_PATH ($SIZE)"
-echo "Next: gh release create vX.Y.Z -R daniellee-ux/Seminarly-AI \"$DMG_PATH\" --title ... --notes ..."
+if [ "$variant" != universal ]; then
+  bash scripts/generate-update-feed.sh "$PACKAGE_OUTPUT" "$variant" "$APP_PATH"
+fi
+
+note "Done → $DMG_PATH ($(du -h "$DMG_PATH" | cut -f1))"
+PACKAGE_ARTIFACTS+=("$DMG_PATH")
+}
+
+for PACKAGE_VARIANT in "${PACKAGE_VARIANTS[@]}"; do
+  package_variant "$PACKAGE_VARIANT"
+done
+
+note "Verified installers → $PACKAGE_OUTPUT"
+shasum -a 256 "${PACKAGE_ARTIFACTS[@]}"
+echo 'Publish the native + legacy DMGs, appcast-*.xml, *.delta, and pinned ChatGPTConnection-*.tar.xz assets together.'
+echo 'Keep update-history locally; set SPARKLE_PREVIOUS_DIR to it for the next release.'

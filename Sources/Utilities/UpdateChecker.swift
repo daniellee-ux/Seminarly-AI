@@ -11,13 +11,37 @@ struct GitHubRelease: Decodable, Equatable, Sendable {
     let name: String?
     let body: String?
     let htmlURL: String
+    let assets: [GitHubReleaseAsset]
+
+    init(tagName: String, name: String?, body: String?, htmlURL: String,
+         assets: [GitHubReleaseAsset] = []) {
+        self.tagName = tagName
+        self.name = name
+        self.body = body
+        self.htmlURL = htmlURL
+        self.assets = assets
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        tagName = try values.decode(String.self, forKey: .tagName)
+        name = try values.decodeIfPresent(String.self, forKey: .name)
+        body = try values.decodeIfPresent(String.self, forKey: .body)
+        htmlURL = try values.decode(String.self, forKey: .htmlURL)
+        assets = try values.decodeIfPresent([GitHubReleaseAsset].self, forKey: .assets) ?? []
+    }
 
     enum CodingKeys: String, CodingKey {
         case tagName = "tag_name"
         case name
         case body
         case htmlURL = "html_url"
+        case assets
     }
+}
+
+struct GitHubReleaseAsset: Decodable, Equatable, Sendable {
+    let name: String
 }
 
 /// Why a check was started — controls how loudly results are reported.
@@ -50,10 +74,8 @@ enum UpdateCheckError: LocalizedError {
     }
 }
 
-/// Detection-only update awareness: asks the GitHub Releases API for the latest
-/// release and, if it's newer than the running build, points the user at the
-/// already-notarized DMG on the release page. No download/verify/install here —
-/// that's the heavier Sparkle path (issue #21).
+/// Quiet opt-in update awareness. User-initiated checks and installation are
+/// handled by Sparkle, including signed delta updates and full-download fallback.
 @MainActor
 final class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
@@ -71,13 +93,9 @@ final class UpdateChecker: ObservableObject {
         string: "https://api.github.com/repos/daniellee-ux/Seminarly-AI/releases/latest"
     )!
 
-    /// Direct-download link for the latest notarized DMG. GitHub's
-    /// `releases/latest/download/<asset>` redirects to the newest release's asset,
-    /// so clicking it downloads the build without landing on a GitHub page. Depends
-    /// on the release asset being named `Seminarly.dmg` (the packaging script's
-    /// fixed name); forks should point this at their own distribution.
-    nonisolated static let downloadURL = URL(
-        string: "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+    /// Safe fallback when a release has no compatible installer attached.
+    nonisolated static let releasesPageURL = URL(
+        string: "https://github.com/daniellee-ux/Seminarly-AI/releases/latest"
     )!
 
     private init() {}
@@ -90,6 +108,10 @@ final class UpdateChecker: ObservableObject {
     // MARK: - Public entry points
 
     func checkForUpdates(mode: UpdateCheckMode) {
+        if mode == .manual {
+            AppUpdater.shared.checkForUpdates()
+            return
+        }
         if activeMode != nil {
             // A check is already running — don't fire a second network request, but
             // honor an explicit manual request by upgrading how the in-flight check
@@ -111,12 +133,28 @@ final class UpdateChecker: ObservableObject {
         availableUpdate = nil
     }
 
-    /// Open the direct download for the latest DMG (see `downloadURL`).
-    func openDownload() {
-        NSWorkspace.shared.open(Self.downloadURL)
+    /// Download the release that was displayed, preferring this Mac's native
+    /// installer. Older releases can still provide the universal Seminarly.dmg.
+    func openDownload(release: GitHubRelease? = nil) {
+        AppUpdater.shared.checkForUpdates()
     }
 
     // MARK: - Pure logic (nonisolated → unit-testable off the main actor)
+
+    nonisolated static func downloadURL(for release: GitHubRelease,
+                                       architecture: ReleaseArchitecture = .current) -> URL {
+        guard SemanticVersion(release.tagName) != nil else { return releasesPageURL }
+        let names = Set(release.assets.map(\.name))
+        guard let name = [architecture.assetName, "Seminarly.dmg"].first(where: names.contains) else {
+            // Never substitute the other CPU's binary or invent a missing asset.
+            return releasesPageURL
+        }
+        // Build a trusted, version-pinned URL instead of opening an arbitrary URL
+        // from release metadata, or racing a later change to /releases/latest.
+        return URL(string: "https://github.com/daniellee-ux/Seminarly-AI/releases/download")!
+            .appendingPathComponent(release.tagName)
+            .appendingPathComponent(name)
+    }
 
     /// Decide what a freshly-fetched release means for the running build. Returns
     /// `.upToDate` whenever a version can't be parsed, so a malformed tag never
@@ -343,7 +381,7 @@ final class UpdateChecker: ObservableObject {
         alert.addButton(withTitle: "Download")
         alert.addButton(withTitle: "Later")
         if alert.runModal() == .alertFirstButtonReturn {
-            openDownload()
+            openDownload(release: release)
         }
     }
 

@@ -149,6 +149,63 @@ final class ChatGPTConnectionTests: XCTestCase {
         XCTAssertFalse(store.isConnected)
     }
 
+    func testRefreshDoesNotDownloadAndSignInPreparesBeforeOpeningBrowser() async throws {
+        var preparations = 0
+        var opened = 0
+        let config = configuration("login")
+        let store = ChatGPTAccountStore(configuration: { config }, prepareRuntime: { progress in
+            preparations += 1
+            progress(.downloading(0.5))
+        }, openURL: { _ in
+            XCTAssertEqual(preparations, 1)
+            opened += 1
+        })
+        store.refresh()
+        try await waitForOperation(store)
+        XCTAssertEqual(preparations, 0)
+        store.signIn()
+        try await waitForOperation(store)
+        XCTAssertEqual(preparations, 1)
+        XCTAssertEqual(opened, 1)
+        XCTAssertNil(store.preparation)
+    }
+
+    func testCancelPreparationNeverOpensBrowserAndAllowsRetry() async throws {
+        var attempts = 0
+        var opened = 0
+        let config = configuration("login")
+        let store = ChatGPTAccountStore(configuration: { config }, prepareRuntime: { _ in
+            attempts += 1
+            if attempts == 1 { try await Task.sleep(for: .seconds(30)) }
+        }, openURL: { _ in opened += 1 })
+        store.signIn()
+        for _ in 0..<100 {
+            if attempts > 0 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        store.cancelSignIn()
+        try await waitForOperation(store)
+        XCTAssertEqual(opened, 0)
+        XCTAssertNil(store.preparation)
+        XCTAssertNil(store.errorMessage)
+        store.signIn()
+        try await waitForOperation(store)
+        XCTAssertEqual(opened, 1)
+        XCTAssertTrue(store.isReady)
+    }
+
+    func testDownloadFailureIsFriendlyAndDoesNotOpenBrowser() async throws {
+        let config = configuration("login")
+        let store = ChatGPTAccountStore(configuration: { config }, prepareRuntime: { _ in
+            throw ChatGPTError.runtimeDownloadFailed
+        }, openURL: { _ in XCTFail("Browser must not open before a verified runtime exists") })
+        store.signIn()
+        try await waitForOperation(store)
+        XCTAssertEqual(store.errorMessage, ChatGPTError.runtimeDownloadFailed.localizedDescription)
+        XCTAssertFalse(store.isWorking)
+        XCTAssertNil(store.preparation)
+    }
+
     func testFailedLoginInvalidURLAndDeviceCodeCancellation() async throws {
         for scenario in ["login-fails", "bad-url"] {
             let config = configuration(scenario)

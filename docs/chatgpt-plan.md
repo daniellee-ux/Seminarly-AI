@@ -8,7 +8,9 @@ Seminarly can generate and enhance notes using the **Codex allowance associated 
 2. Click **Sign in with ChatGPT** and finish signing in in your browser.
 3. Generate or enhance notes as usual.
 
-The connection component is included with Seminarly. You do **not** need to install Codex, Node, Homebrew, or a terminal tool. It is not downloaded during sign-in and is updated with the app. A missing or incompatible component asks you to update/reinstall Seminarly, never to manage another app.
+On first sign-in, Seminarly automatically downloads the native connection component (roughly 44 MB on Apple Silicon or 52 MB on Intel), verifies it, and opens the browser. You do **not** need to install or know about Codex, Node, Homebrew, or a terminal tool. Progress, cancellation, and retry are available in Settings. Opening Settings alone never downloads executable code.
+
+The component is cached under `~/Library/Application Support/ai.seminarly/ChatGPTComponents`, outside the app, so ordinary app updates do not download it again. Only a new app release can change the pinned runtime. A missing or damaged cache is repaired when you choose **Sign in with ChatGPT**. The first download needs internet access; using an already-prepared component does not need another download (ChatGPT itself still needs a network connection).
 
 When upgrading from the earlier external-tool Beta, macOS may ask you to allow access to your saved sign-in in Keychain. This is an OS permission prompt, not an installation step. Seminarly keeps the existing account profile, allows time for the prompt, and lets you cancel while connecting. The helper uses the stable signing identifier `ai.seminarly.chatgpt` for future app updates.
 
@@ -34,9 +36,13 @@ Before promoting out of Beta, additionally verify real device-code login, full a
 
 ## Developer verification
 
-The Xcode build phase `scripts/embed-chatgpt-runtime.sh` downloads official **0.156.1** standalone App Server artifacts at build time, verifies source-controlled SHA-256 pins, and embeds the selected Mac architectures. Downloads are cached under ignored `build/chatgpt-runtime/0.156.1/`; no binary is committed to Git. Clean source builds need network access once. The helper is signed before the enclosing app, and release packaging verifies its architecture, Developer ID signature, hardened runtime, and notices before notarization. The pinned Apache-2.0 LICENSE, upstream NOTICE, and origin/modification notice are included in `Contents/Resources/ThirdParty/OpenAICodex/`.
+`scripts/package-app.sh --runtime-only` prepares native **0.156.1** standalone App Server packages from checksum-pinned upstream archives, applies the app publisher's stable identifier, and notarizes/staples the component bundles. It generates a public manifest; review and commit the manifest before building Seminarly, and publish the matching immutable assets with the indicated release. No executable is committed to Git. The ordinary Xcode build only embeds the manifest and Apache-2.0 LICENSE, NOTICE, and origin notice. See [packaging](packaging.md) for the release sequence.
 
-The previous manually selected executable preference is intentionally ignored. Only the helper inside the app is used; no executable is discovered from PATH or the user's other installations. The existing private sign-in profile and Keychain namespace are retained.
+The installer verifies the exact archive size/SHA-256 **before extraction**, then verifies the executable size/SHA-256 and Developer ID team/identifier against the manifest sealed into the app signature. It rejects symlinks and unsigned/wrong-publisher code, uses HTTPS with a restricted redirect-host allowlist, bounds downloads, and installs only a fully verified bundle via a same-volume rename. A cancelled or failed operation cleans its private staging directory; it cannot publish a partial cache entry. Launches revalidate the cached code. Transient network failures retry once; integrity failures require an explicit retry.
+
+The previous manually selected executable preference is intentionally ignored. Only the verified private cache is used; no executable is discovered from PATH or the user's other installations. The existing private sign-in profile and Keychain namespace are retained.
+
+Native Apple Silicon and Intel installers omit the heavy runtime entirely. LZMA disk-image compression further reduces downloads. The universal `Seminarly.dmg` is retained for older update clients. The first ChatGPT preparation defers bytes rather than eliminating them for ChatGPT users; non-ChatGPT users never download the component.
 
 Offline tests use `Tests/Fixtures/fake-codex.py` (Python 3 provided with Xcode command-line tools) as a JSONL process fixture. They cover chunk framing, login races, URL validation, cancellation, pagination, timeout/process exit, unsupported runtimes, structured schemas, partial-response rejection, tool refusal, quota errors, and logout failures. No credentials or remote AI requests are used.
 
@@ -55,7 +61,7 @@ swiftc -swift-version 6 -parse-as-library \
   Sources/NoteStructuring/ChatGPT/CodexRuntime.swift \
   Sources/Utilities/SemanticVersion.swift scripts/smoke-codex.swift \
   -o /tmp/seminarly-codex-smoke
-/tmp/seminarly-codex-smoke /absolute/path/to/Seminarly.app/Contents/Helpers/seminarly-chatgpt
+/tmp/seminarly-codex-smoke /absolute/path/to/ChatGPTConnection.app/Contents/MacOS/seminarly-chatgpt
 ```
 
 The helper uses a fresh temporary profile, verifies it is signed out, creates an ephemeral empty thread with the named permissions profile, then cleans up its temporary files. It does not initiate OAuth or send a model turn.

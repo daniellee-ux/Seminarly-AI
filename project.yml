@@ -14,6 +14,9 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.4"
 
 packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.0"
   WhisperKit:
     url: https://github.com/argmaxinc/WhisperKit
     from: "0.18.0"
@@ -29,7 +32,7 @@ targets:
     type: application
     platform: macOS
     postBuildScripts:
-      - name: Embed ChatGPT connection component
+      - name: Embed ChatGPT notices
         script: bash "${SRCROOT}/scripts/embed-chatgpt-runtime.sh"
         basedOnDependencyAnalysis: false
         inputFiles:
@@ -37,7 +40,6 @@ targets:
           - $(SRCROOT)/scripts/lib/chatgpt-runtime.sh
           - $(SRCROOT)/scripts/chatgpt-runtime-origin.txt
         outputFiles:
-          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/seminarly-chatgpt
           - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/LICENSE
           - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/NOTICE
           - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/ORIGIN.txt
@@ -57,14 +59,15 @@ targets:
         INFOPLIST_FILE: Sources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Seminarly.entitlements
         PRODUCT_NAME: Seminarly
-        MARKETING_VERSION: "0.1.11"
-        CURRENT_PROJECT_VERSION: "12"
+        MARKETING_VERSION: "0.1.12"
+        CURRENT_PROJECT_VERSION: "13"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: true
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
+      - package: Sparkle
       - package: WhisperKit
       - package: FluidAudio
       # Embed the self-contained CLI into Contents/Helpers/ and code-sign it on

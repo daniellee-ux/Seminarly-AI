@@ -313,7 +313,7 @@ struct SettingsView: View {
 
                     Toggle("Automatically check for updates", isOn: $updateSettings.automaticallyCheckForUpdates)
 
-                    Text("Seminarly is local-first — your audio never leaves your Mac. Checking for updates is the one exception: it asks GitHub for the latest release version, sending no information about you. When enabled, Seminarly checks at most once a day and shows a dismissible banner if a newer version exists.")
+                    Text("When enabled, Seminarly checks GitHub at most once a day and shows a dismissible banner. Updates are downloaded and installed only when you choose, using smaller difference downloads when available. No meeting content or system profile is sent; GitHub receives normal network request information such as your IP address.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

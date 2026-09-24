@@ -46,6 +46,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor private static var activeSavePipelines = 0
     @MainActor private static var terminationPending = false
 
+    @MainActor static var hasActiveRecordingWork: Bool {
+        activeSavePipelines > 0 || TranscriptionEngine.shared.isSessionActive
+    }
+
     /// Bracket a finalize/save pipeline so Cmd+Q / menu-bar Quit waits for the
     /// meeting to land in the store instead of killing it mid-flight.
     @MainActor static func beginSavePipeline() {

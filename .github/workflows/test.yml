@@ -19,6 +19,8 @@ jobs:
         run: |
           bash scripts/tests/signing-identity-test.sh
           bash scripts/tests/chatgpt-runtime-test.sh
+          bash scripts/tests/package-architecture-test.sh
+          python3 scripts/tests/update-feed-test.py
 
       - name: Install XcodeGen
         run: brew install xcodegen
