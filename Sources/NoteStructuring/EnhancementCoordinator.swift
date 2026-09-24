@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import Combine
 import os.log
 
 private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "EnhancementCoordinator")
@@ -33,8 +34,12 @@ final class EnhancementCoordinator: ObservableObject {
     @Published private(set) var errors: [PersistentIdentifier: String] = [:]
 
     private var tasks: [PersistentIdentifier: Task<Void, Never>] = [:]
+    private var observations: Set<AnyCancellable> = []
 
-    private init() {}
+    private init() {
+        LLMSettings.shared.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &observations)
+        ChatGPTAccountStore.shared.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &observations)
+    }
 
     // MARK: - Query
 
@@ -48,11 +53,16 @@ final class EnhancementCoordinator: ObservableObject {
         errors[meeting.persistentModelID]
     }
 
-    /// Whether the active provider has an API key configured. Mirrors
-    /// `NoteStructuringService` so views can gate the Enhance button without
-    /// holding their own service instance.
-    var hasAPIKey: Bool {
-        KeychainStore.exists(for: LLMSettings.shared.currentDescriptor.keychainAccount)
+    var isProviderReady: Bool {
+        if LLMSettings.shared.currentDescriptor.kind == .chatGPTPlan { return ChatGPTAccountStore.shared.isReady }
+        return KeychainStore.exists(for: LLMSettings.shared.currentDescriptor.keychainAccount)
+    }
+
+    var providerSetupMessage: String {
+        if LLMSettings.shared.currentDescriptor.kind == .chatGPTPlan {
+            return ChatGPTAccountStore.shared.isWorking ? "Checking ChatGPT account…" : "Connect your ChatGPT account in Settings to generate notes"
+        }
+        return "Add your \(currentProviderDisplayName) API key in Settings to generate notes"
     }
 
     var currentProviderDisplayName: String {

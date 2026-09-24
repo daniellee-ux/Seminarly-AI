@@ -102,6 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        CodexProcessRegistry.shared.terminateAll()
         let success = DatabaseCheckpoint.performCheckpoint(at: Self.storeURL, mode: .truncate)
         logger.notice("applicationWillTerminate checkpoint success=\(success, privacy: .public)")
     }

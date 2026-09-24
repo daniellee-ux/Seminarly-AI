@@ -87,120 +87,126 @@ struct SettingsView: View {
                         modelSaveStatus = nil
                     }
 
-                    TextField(
-                        llmSettings.currentDescriptor.modelFieldLabel,
-                        text: $modelDraft,
-                        prompt: Text(llmSettings.currentDescriptor.modelPlaceholder)
-                    )
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { saveModel() }
+                    if llmSettings.currentDescriptor.kind != .chatGPTPlan {
+                        TextField(
+                            llmSettings.currentDescriptor.modelFieldLabel,
+                            text: $modelDraft,
+                            prompt: Text(llmSettings.currentDescriptor.modelPlaceholder)
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { saveModel() }
 
-                    HStack {
-                        Button {
-                            saveModel()
-                        } label: {
-                            Text("Save Model")
-                                .font(Typography.captionMedium)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, Spacing.sm)
-                                .padding(.vertical, Spacing.xxs)
-                                .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(modelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == llmSettings.currentModel)
-                        .opacity(modelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == llmSettings.currentModel ? 0.4 : 1.0)
-
-                        Button {
-                            resetModel()
-                        } label: {
-                            Text("Reset")
-                                .font(Typography.captionMedium)
-                                .foregroundStyle(SeminarlyColors.textSecondary)
-                                .padding(.horizontal, Spacing.sm)
-                                .padding(.vertical, Spacing.xxs)
-                                .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-
-                        if let status = modelSaveStatus {
-                            Text(status)
-                                .font(Typography.caption)
-                                .foregroundStyle(SeminarlyColors.success)
-                        }
-                    }
-
-                    Text(llmSettings.currentDescriptor.modelFieldLabel == "Endpoint ID"
-                        ? "Provision an Endpoint ID in the Volcengine ARK console and paste it here."
-                        : "Edit to use a different model from this provider.")
-                        .font(Typography.caption)
-                        .foregroundStyle(SeminarlyColors.textSecondary)
-                }
-
-                Section("API Key for \(llmSettings.currentDescriptor.displayName)") {
-                    HStack {
-                        if showingKey {
-                            TextField("Enter to replace stored key", text: $apiKey)
-                                .textFieldStyle(.roundedBorder)
-                        } else {
-                            SecureField("Enter to replace stored key", text: $apiKey)
-                                .textFieldStyle(.roundedBorder)
-                        }
-
-                        Button {
-                            showingKey.toggle()
-                        } label: {
-                            Image(systemName: showingKey ? "eye.slash" : "eye")
-                        }
-                        .buttonStyle(.borderless)
-                    }
-
-                    HStack {
-                        Button {
-                            saveAPIKey()
-                        } label: {
-                            Text("Save Key")
-                                .font(Typography.captionMedium)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, Spacing.sm)
-                                .padding(.vertical, Spacing.xxs)
-                                .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(apiKey.isEmpty)
-                        .opacity(apiKey.isEmpty ? 0.4 : 1.0)
-
-                        if hasExistingKey {
+                        HStack {
                             Button {
-                                removeAPIKey()
+                                saveModel()
                             } label: {
-                                Text("Remove Key")
+                                Text("Save Model")
                                     .font(Typography.captionMedium)
-                                    .foregroundStyle(SeminarlyColors.destructive)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, Spacing.sm)
+                                    .padding(.vertical, Spacing.xxs)
+                                    .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(modelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == llmSettings.currentModel)
+                            .opacity(modelDraft.trimmingCharacters(in: .whitespacesAndNewlines) == llmSettings.currentModel ? 0.4 : 1.0)
+
+                            Button {
+                                resetModel()
+                            } label: {
+                                Text("Reset")
+                                    .font(Typography.captionMedium)
+                                    .foregroundStyle(SeminarlyColors.textSecondary)
                                     .padding(.horizontal, Spacing.sm)
                                     .padding(.vertical, Spacing.xxs)
                                     .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
                             }
                             .buttonStyle(.plain)
+
+                            Spacer()
+
+                            if let status = modelSaveStatus {
+                                Text(status)
+                                    .font(Typography.caption)
+                                    .foregroundStyle(SeminarlyColors.success)
+                            }
                         }
 
-                        Spacer()
-
-                        if let status = saveStatus {
-                            Text(status)
-                                .font(Typography.caption)
-                                .foregroundStyle(status.contains("Error") ? SeminarlyColors.destructive : SeminarlyColors.success)
-                        } else {
-                            Text(hasExistingKey ? "Key stored in Keychain" : "No key configured")
-                                .font(Typography.caption)
-                                .foregroundStyle(hasExistingKey ? SeminarlyColors.success : SeminarlyColors.textSecondary)
-                        }
+                        Text(llmSettings.currentDescriptor.modelFieldLabel == "Endpoint ID"
+                            ? "Provision an Endpoint ID in the Volcengine ARK console and paste it here."
+                            : "Edit to use a different model from this provider.")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textSecondary)
                     }
+                }
 
-                    Text("Your API key is stored securely in the macOS Keychain. Each provider has its own key.")
-                        .font(Typography.caption)
-                        .foregroundStyle(SeminarlyColors.textSecondary)
+                if llmSettings.currentDescriptor.kind == .chatGPTPlan {
+                    ChatGPTSettingsSection()
+                } else {
+                    Section("API Key for \(llmSettings.currentDescriptor.displayName)") {
+                        HStack {
+                            if showingKey {
+                                TextField("Enter to replace stored key", text: $apiKey)
+                                    .textFieldStyle(.roundedBorder)
+                            } else {
+                                SecureField("Enter to replace stored key", text: $apiKey)
+                                    .textFieldStyle(.roundedBorder)
+                            }
+
+                            Button {
+                                showingKey.toggle()
+                            } label: {
+                                Image(systemName: showingKey ? "eye.slash" : "eye")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+
+                        HStack {
+                            Button {
+                                saveAPIKey()
+                            } label: {
+                                Text("Save Key")
+                                    .font(Typography.captionMedium)
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, Spacing.sm)
+                                    .padding(.vertical, Spacing.xxs)
+                                    .background(SeminarlyColors.accent, in: RoundedRectangle(cornerRadius: 6))
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(apiKey.isEmpty)
+                            .opacity(apiKey.isEmpty ? 0.4 : 1.0)
+
+                            if hasExistingKey {
+                                Button {
+                                    removeAPIKey()
+                                } label: {
+                                    Text("Remove Key")
+                                        .font(Typography.captionMedium)
+                                        .foregroundStyle(SeminarlyColors.destructive)
+                                        .padding(.horizontal, Spacing.sm)
+                                        .padding(.vertical, Spacing.xxs)
+                                        .background(SeminarlyColors.surface, in: RoundedRectangle(cornerRadius: 6))
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            Spacer()
+
+                            if let status = saveStatus {
+                                Text(status)
+                                    .font(Typography.caption)
+                                    .foregroundStyle(status.contains("Error") ? SeminarlyColors.destructive : SeminarlyColors.success)
+                            } else {
+                                Text(hasExistingKey ? "Key stored in Keychain" : "No key configured")
+                                    .font(Typography.caption)
+                                    .foregroundStyle(hasExistingKey ? SeminarlyColors.success : SeminarlyColors.textSecondary)
+                            }
+                        }
+
+                        Text("Your API key is stored securely in the macOS Keychain. Each provider has its own key.")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                    }
                 }
 
                 Section("Whisper Model") {
@@ -513,7 +519,7 @@ struct SettingsView: View {
     /// switches providers.
     private func refreshAPIKeyState() {
         let account = llmSettings.currentDescriptor.keychainAccount
-        hasExistingKey = KeychainStore.exists(for: account)
+        hasExistingKey = llmSettings.currentDescriptor.kind != .chatGPTPlan && KeychainStore.exists(for: account)
         apiKey = ""
         saveStatus = nil
     }

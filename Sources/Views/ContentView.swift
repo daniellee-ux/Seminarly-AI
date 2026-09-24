@@ -208,6 +208,7 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            if LLMSettings.shared.currentDescriptor.kind == .chatGPTPlan { ChatGPTAccountStore.shared.refresh() }
             if case .recoveredByQuarantine = databaseState.error {
                 showRecoveryNoticeAlert = true
             }
