@@ -122,19 +122,19 @@ enum ChatGPTError: LocalizedError, Sendable, Equatable {
 
     var errorDescription: String? {
         switch self {
-        case .runtimeMissing: "Install Codex or choose its executable in Settings → ChatGPT plan."
-        case .runtimeTooOld: "Update Codex to version \(CodexRuntime.minimumVersion) or later to use ChatGPT in Seminarly."
+        case .runtimeMissing: "Seminarly's ChatGPT connection component is missing or damaged. Reinstall the latest Seminarly and try again."
+        case .runtimeTooOld: "Update Seminarly to reconnect to ChatGPT."
         case .signedOut: "Connect your ChatGPT account in Settings to generate notes."
-        case .invalidProtocol: "Codex returned an incompatible response. Update Codex and reconnect in Settings."
+        case .invalidProtocol: "The ChatGPT connection needs an update. Update Seminarly and try again."
         case .connectionClosed: "The ChatGPT connection closed. Reconnect in Settings and try again."
         case .timedOut: "ChatGPT did not respond in time. Check your connection and try again."
-        case .loginFailed: "ChatGPT sign-in did not complete. Try again or use a device code. Your workspace may restrict Codex access."
-        case .invalidLoginURL: "Codex returned an unexpected sign-in address. Update Codex and try again."
+        case .loginFailed: "ChatGPT sign-in did not complete. Try again or choose another sign-in method. Your workspace may restrict access."
+        case .invalidLoginURL: "ChatGPT returned an unexpected sign-in address. Update Seminarly and try again."
         case .rateLimited: "Your ChatGPT plan's usage limit has been reached. Wait for it to reset or choose an API provider in Settings."
         case .contextTooLong: "This transcript exceeds the model's context limit. Try a shorter transcript or another model."
         case .generationFailed: "ChatGPT could not generate notes. Check your account, model access, and usage in Settings, then try again."
         case .toolsDisabled: "ChatGPT requested a tool that is unavailable for note generation. Please try again."
-        case .privacyUnavailable: "This Codex version could not create an isolated temporary session. Update Codex and try again."
+        case .privacyUnavailable: "A private ChatGPT session could not be created. Update Seminarly and try again."
         }
     }
 

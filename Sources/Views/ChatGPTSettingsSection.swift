@@ -1,27 +1,19 @@
 import SwiftUI
-import AppKit
 
 struct ChatGPTSettingsSection: View {
     @ObservedObject private var account = ChatGPTAccountStore.shared
     @ObservedObject private var settings = LLMSettings.shared
+    @State private var showsOptions = false
+    @State private var showsOtherSignIn = false
 
     var body: some View {
-        Section("ChatGPT plan · Beta") {
-            Text("Use the Codex allowance included in your ChatGPT plan. No OpenAI API key is needed. Plan limits and workspace restrictions still apply; this is not unlimited API access.")
+        Section("ChatGPT · Beta") {
+            Text("Sign in with your ChatGPT account to generate notes. No API key or extra installation needed.")
                 .font(.caption).foregroundStyle(.secondary)
 
             if let identity = account.account {
                 LabeledContent("Account", value: identity.email ?? "ChatGPT")
                 LabeledContent("Plan", value: identity.planType?.capitalized ?? "Unknown")
-                Picker("Model", selection: $settings.currentModel) {
-                    Text("Automatic (account default)").tag(CodexRuntime.automaticModel)
-                    ForEach(account.models) { model in Text(model.displayName).tag(model.model) }
-                    if settings.currentModel != CodexRuntime.automaticModel,
-                       !account.models.contains(where: { $0.model == settings.currentModel }) {
-                        Text("\(settings.currentModel) (unavailable — choose another)").tag(settings.currentModel)
-                    }
-                }
-                .disabled(account.isWorking)
                 if let limits = account.rateLimits {
                     Text("Usage at last refresh").font(.caption).foregroundStyle(.secondary)
                     if let primary = limits.primary { usage(primary, label: "Primary window") }
@@ -29,9 +21,18 @@ struct ChatGPTSettingsSection: View {
                     if limits.isExhausted {
                         Text(ChatGPTError.rateLimited.localizedDescription).font(.caption).foregroundStyle(.orange)
                     }
-                } else {
-                    Text("Usage information is unavailable for this account.").font(.caption).foregroundStyle(.secondary)
                 }
+                DisclosureGroup("Options", isExpanded: $showsOptions) {
+                    modelPicker
+                    Button("Refresh account") { account.refresh() }
+                        .disabled(account.isWorking)
+                    if account.rateLimits == nil {
+                        Text("Usage information is unavailable for this account.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                Button("Sign out", role: .destructive) { account.signOut() }
+                    .disabled(account.isWorking)
             }
 
             if let login = account.pendingLogin {
@@ -42,40 +43,37 @@ struct ChatGPTSettingsSection: View {
                     Button("Cancel") { account.cancelSignIn() }
                 }
                 if login.userCode != nil {
-                    Text("Device-code sign-in may need to be enabled in your ChatGPT security settings or by your workspace administrator.")
+                    Text("This sign-in method may need to be enabled in your ChatGPT security settings or by your workspace administrator.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-            } else {
-                HStack {
-                    if account.isConnected {
-                        Button("Refresh account") { account.refresh() }
-                        Button("Sign out", role: .destructive) { account.signOut() }
-                    } else {
-                        Button("Sign in with ChatGPT") { account.signIn() }
-                            .buttonStyle(.borderedProminent)
-                        Button("Use device code") { account.signIn(deviceCode: true) }
-                        Button("Refresh") { account.refresh() }
+            } else if !account.isConnected {
+                Button("Sign in with ChatGPT") { account.signIn() }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(account.isWorking)
+                DisclosureGroup("Trouble signing in?", isExpanded: $showsOtherSignIn) {
+                    Button("Sign in with a one-time code") { account.signIn(deviceCode: true) }
+                        .disabled(account.isWorking)
+                }
+            }
+            if account.isWorking {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(account.pendingLogin == nil ? "Connecting to ChatGPT…" : "Waiting for sign-in…")
+                        .font(.caption).foregroundStyle(.secondary)
+                    if account.pendingLogin == nil && !account.isConnected {
+                        Button("Cancel") { account.cancelSignIn() }
                     }
                 }
-                .disabled(account.isWorking)
+                if account.pendingLogin == nil {
+                    Text("If macOS asks, allow access to your saved ChatGPT sign-in.")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
             }
-            if account.isWorking { ProgressView().controlSize(.small) }
             if let error = account.errorMessage { Text(error).font(.caption).foregroundStyle(.red) }
 
-            Text("Requires Codex \(CodexRuntime.minimumVersion) or later. App Server is experimental. Seminarly uses its own sign-in, stored by Codex in the macOS Keychain; signing out here does not sign out your regular Codex tools.")
+            Text("Your plan's usage limits and workspace restrictions apply. This connection is in Beta; availability may differ from the ChatGPT website.")
                 .font(.caption).foregroundStyle(.secondary)
-            LabeledContent("Codex runtime", value: account.executablePath ?? "Not found")
-                .font(.caption).textSelection(.enabled)
-            HStack {
-                Link("Install or update Codex", destination: URL(string: "https://learn.chatgpt.com/docs/codex-cli")!)
-                Button("Choose executable…") { chooseExecutable() }.disabled(account.isWorking)
-                Button("Auto-detect") {
-                    UserDefaults.standard.removeObject(forKey: CodexRuntime.executablePreference)
-                    account.updateExecutablePath()
-                    account.refresh()
-                }.disabled(account.isWorking)
-            }
-            Text("Only the transcript and notes you choose to enhance are sent to OpenAI. Audio stays on your Mac. Temporary note-generation sessions are not added to Codex history. OpenAI's account data controls still apply.")
+            Text("Only the transcript and notes you choose to enhance are sent to OpenAI. Audio stays on your Mac. Your sign-in is stored securely in macOS Keychain and is separate from other apps.")
                 .font(.caption).foregroundStyle(.secondary)
         }
         .onAppear { account.refresh() }
@@ -91,15 +89,15 @@ struct ChatGPTSettingsSection: View {
         }.font(.caption)
     }
 
-    private func chooseExecutable() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose the Codex executable"
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = false
-        panel.showsHiddenFiles = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        UserDefaults.standard.set(url.path, forKey: CodexRuntime.executablePreference)
-        account.updateExecutablePath()
-        account.refresh()
+    private var modelPicker: some View {
+        Picker("Model", selection: $settings.currentModel) {
+            Text("Automatic (recommended)").tag(CodexRuntime.automaticModel)
+            ForEach(account.models) { model in Text(model.displayName).tag(model.model) }
+            if settings.currentModel != CodexRuntime.automaticModel,
+               !account.models.contains(where: { $0.model == settings.currentModel }) {
+                Text("\(settings.currentModel) (unavailable — choose another)").tag(settings.currentModel)
+            }
+        }
+        .disabled(account.isWorking)
     }
 }

@@ -32,7 +32,7 @@ Grant permissions when prompted:
 
 ### 3. Connect your AI provider
 
-Open **Settings** (gear icon) → **AI Provider**. Choose **ChatGPT plan (Beta)** to sign in with ChatGPT and use your plan's Codex allowance, without buying API credits. This requires an installed [Codex CLI](https://learn.chatgpt.com/docs/codex-cli) version **0.155.1 or later**; see [setup and limitations](docs/chatgpt-plan.md).
+Open **Settings** (gear icon) → **AI Provider**. Choose **ChatGPT (Beta)**, click **Sign in with ChatGPT**, and finish signing in in your browser. Everything needed is included with Seminarly: no terminal, extra installation, or API key. Your plan's usage limits and workspace restrictions apply; see [setup and limitations](docs/chatgpt-plan.md).
 
 Alternatively, choose an API provider and paste its API key. Keys are stored in macOS Keychain and sent only to the selected provider for authentication. ChatGPT plan and OpenAI API are separate billing options; Seminarly never silently falls back to the paid API.
 
@@ -123,7 +123,7 @@ Configure providers in **Settings → AI Provider**. ChatGPT uses managed sign-i
 | Provider | Default model | Authentication |
 |---|---|---|
 | **Anthropic Claude** *(default)* | `claude-sonnet-4-6` | [console.anthropic.com](https://console.anthropic.com) |
-| **ChatGPT plan (Beta)** | Account default (discovered from Codex) | [ChatGPT sign-in](docs/chatgpt-plan.md); no API key |
+| **ChatGPT (Beta)** | Automatic (account default) | [ChatGPT sign-in](docs/chatgpt-plan.md); no API key or extra installation |
 | **OpenAI API** | `gpt-5.5` | [platform.openai.com](https://platform.openai.com) |
 | **Google Gemini** | `gemini-3.1-flash-lite-preview` | [aistudio.google.com](https://aistudio.google.com) |
 | **xAI Grok** | `grok-4.20` | [console.x.ai](https://console.x.ai) |
@@ -159,7 +159,7 @@ Each note-generation call typically costs ~$0.02–0.04 on Claude Sonnet; compar
   - `medium` — good accuracy, ~1.5 GB RAM
   - `small` — usable for clear English, ~500 MB RAM
 - Xcode 16.3+ (matches `project.yml`)
-- A ChatGPT account with Codex access and Codex CLI 0.155.1+, or an API key from a supported provider
+- An eligible ChatGPT account, or an API key from a supported provider
 
 ---
 

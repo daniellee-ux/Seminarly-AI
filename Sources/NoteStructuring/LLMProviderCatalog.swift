@@ -48,7 +48,7 @@ enum LLMProviderCatalog {
         ),
         LLMProviderDescriptor(
             id: "chatgpt-plan",
-            displayName: "ChatGPT plan (Beta)",
+            displayName: "ChatGPT (Beta)",
             kind: .chatGPTPlan,
             baseURL: "stdio://",
             defaultModel: CodexRuntime.automaticModel,

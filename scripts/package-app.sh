@@ -147,6 +147,26 @@ fi
 codesign --verify --strict "$HELPER"
 echo "  ✓ Contents/Helpers/seminarly-cli — Developer ID, hardened, valid"
 
+note "Verifying bundled ChatGPT connection component"
+CHATGPT_HELPER="$APP_PATH/Contents/Helpers/seminarly-chatgpt"
+if [ ! -x "$CHATGPT_HELPER" ]; then
+  echo "✗ ChatGPT connection component missing. Check the embed build phase." >&2
+  exit 1
+fi
+CHATGPT_SIG="$(codesign -dv --verbose=4 "$CHATGPT_HELPER" 2>&1)"
+if [[ "$CHATGPT_SIG" != *"runtime"* ]] || [[ "$CHATGPT_SIG" != *"TeamIdentifier=$TEAM_ID"* ]]; then
+  echo "✗ ChatGPT connection component is not hardened and signed by the app publisher." >&2
+  exit 1
+fi
+codesign --verify --strict --all-architectures "$CHATGPT_HELPER"
+for CHATGPT_ARCH in $(lipo -archs "$APP_PATH/Contents/MacOS/$APP_NAME"); do
+  lipo "$CHATGPT_HELPER" -verify_arch "$CHATGPT_ARCH"
+done
+for CHATGPT_NOTICE in LICENSE NOTICE ORIGIN.txt; do
+  test -s "$APP_PATH/Contents/Resources/ThirdParty/OpenAICodex/$CHATGPT_NOTICE"
+done
+echo "  ✓ ChatGPT component — app architectures, Developer ID, hardened, notices present"
+
 note "Building styled DMG (dmgbuild — headless, no Finder/AppleScript)"
 DMGVENV="$PWD/.dmgvenv"
 if [ ! -x "$DMGVENV/bin/dmgbuild" ]; then
