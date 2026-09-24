@@ -54,6 +54,10 @@ struct AnthropicStreamAccumulator {
     mutating func consume(line: String) throws {
         if line.isEmpty {
             try dispatchEvent()
+        } else if line.hasPrefix("event:") {
+            // AsyncLineSequence omits blank SSE separator lines. A new event
+            // header is therefore the reliable boundary for the prior event.
+            try dispatchEvent()
         } else if line.hasPrefix("data:") {
             var value = String(line.dropFirst(5))
             if value.first == " " { value.removeFirst() }

@@ -2,6 +2,31 @@ import XCTest
 @testable import Seminarly
 
 final class AnthropicStreamAccumulatorTests: XCTestCase {
+    func testAsyncLinesWithoutBlankSeparatorsStillDecodeEvents() async throws {
+        let fixture = """
+        event: message_start
+        data: {"type":"message_start"}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Recovered"}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+
+        """
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("seminarly-sse-\(UUID().uuidString).txt")
+        try fixture.write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        var stream = AnthropicStreamAccumulator()
+        for try await line in url.lines {
+            try stream.consume(line: line)
+        }
+
+        XCTAssertEqual(try stream.finish(), "Recovered")
+    }
+
     func testAccumulatesTextAcrossEventsAndPings() throws {
         var stream = AnthropicStreamAccumulator()
         let lines = [
