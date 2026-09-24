@@ -12,8 +12,10 @@ protocol LLMProvider: Sendable {
 enum LLMProviderError: LocalizedError {
     case noAPIKey(providerDisplayName: String)
     case invalidResponse
+    case incompleteResponse
     case emptyResponse
     case apiError(Int, String)
+    case providerError(String)
     case missingEndpointID(providerDisplayName: String)
 
     var errorDescription: String? {
@@ -22,10 +24,14 @@ enum LLMProviderError: LocalizedError {
             return "No API key configured for \(name). Add it in Settings."
         case .invalidResponse:
             return "Invalid response from provider"
+        case .incompleteResponse:
+            return "The provider connection closed before the response finished. Please try again."
         case .emptyResponse:
             return "Provider returned an empty response"
         case .apiError(let code, let message):
             return "API error (\(code)): \(message)"
+        case .providerError(let message):
+            return "Provider error: \(message)"
         case .missingEndpointID(let name):
             return "\(name) requires an Endpoint ID. Configure one in Settings."
         }

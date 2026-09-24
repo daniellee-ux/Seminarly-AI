@@ -39,6 +39,7 @@
 		46177C81A0C684777B7808E3 /* ListCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E102078703CD4DAD162330 /* ListCommand.swift */; };
 		471872393F8D54858CA48CBA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220744F42A1788F0FE2D6AB4 /* SettingsView.swift */; };
 		4D58D1C0B0D2F7FC64EF927C /* LLMProviderCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF58A59895428D2591DB58F5 /* LLMProviderCatalogTests.swift */; };
+		4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */; };
 		4E747E200CB180C9D52D7681 /* LLMSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B44FEA6BC39BCDB826FD57 /* LLMSettings.swift */; };
 		569391AC2571A5DDBA8BEEFF /* NoteTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10363E60B17A3874C19B4B56 /* NoteTemplate.swift */; };
 		588808A26C68718D3CF6A823 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582B18F272268549F5F54328 /* Assets.xcassets */; };
@@ -198,6 +199,7 @@
 		8C186469B8F8014AFC557D7D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		8D26185876B64E5A4D977EC7 /* GetCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetCommand.swift; sourceTree = "<group>"; };
 		8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneCaptureManager.swift; sourceTree = "<group>"; };
+		903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamAccumulatorTests.swift; sourceTree = "<group>"; };
 		91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageAwareDiarizationTests.swift; sourceTree = "<group>"; };
 		9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseRecoveryTests.swift; sourceTree = "<group>"; };
 		94BD96750494903A36134D6E /* MeetingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingModel.swift; sourceTree = "<group>"; };
@@ -405,6 +407,7 @@
 		E917972C36E6B43A1C972A0D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */,
 				1A0535A24CD213346912417B /* AudioBufferAccumulatorTests.swift */,
 				A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */,
 				7A1ADE195415707A7D45D383 /* CodableModelTests.swift */,
@@ -599,6 +602,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */,
 				2CE8C9C10E6672A11C0C63DD /* AudioBufferAccumulatorTests.swift in Sources */,
 				08F978A443863CEEB70C3926 /* AudioFormatConverterTests.swift in Sources */,
 				31388B68A62FAF9939159BAB /* CodableModelTests.swift in Sources */,
@@ -863,14 +867,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.7;
+				MARKETING_VERSION = 0.1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
@@ -886,14 +890,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.7;
+				MARKETING_VERSION = 0.1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
