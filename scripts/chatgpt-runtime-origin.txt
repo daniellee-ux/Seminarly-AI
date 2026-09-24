@@ -5,11 +5,12 @@ Source: https://github.com/openai/codex/tree/rust-v0.156.1
 Artifacts: https://github.com/openai/codex/releases/tag/rust-v0.156.1
 License: Apache License 2.0 (see LICENSE and NOTICE alongside this file).
 
-The upstream source is unmodified. Seminarly combines the official macOS
-architecture slices into a universal executable, names it seminarly-chatgpt,
-and applies the app publisher's code signature for macOS distribution.
+The upstream source is unmodified. Seminarly selects the official macOS
+architecture, names the executable seminarly-chatgpt, and applies the app
+publisher's code signature for macOS distribution.
 The component is a separate process, not a library linked into Seminarly.
-It is not installed onto the user's PATH and is updated only with Seminarly.
+It is downloaded on first use into Seminarly's private cache, never installed
+onto the user's PATH. Only a new Seminarly release can change the pinned version.
 
 OpenAI's hosted services remain subject to the user's account terms, access,
 usage limits, and workspace policies. Open-source licensing of this component

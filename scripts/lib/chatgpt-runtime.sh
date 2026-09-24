@@ -2,6 +2,7 @@
 # Pinned official upstream artifacts. Upgrade deliberately, then run the actual
 # App Server smoke and auth tests before shipping a new version.
 CHATGPT_RUNTIME_VERSION=0.156.1
+CHATGPT_RUNTIME_REVISION=1
 # OpenAI's release publisher mirrors the same checksum-verified GitHub artifacts
 # here (.github/scripts/publish_r2_release.py in the pinned upstream source).
 CHATGPT_RUNTIME_BASE_URL="https://releases.openai.com/codex/releases/${CHATGPT_RUNTIME_VERSION}"

@@ -12,6 +12,12 @@ The notepad is the key difference. Instead of passively summarising everything, 
 
 ### 1. Install
 
+Download the notarized DMG from the [latest release](https://github.com/daniellee-ux/Seminarly-AI/releases/latest), then drag Seminarly into Applications.
+
+When architecture-specific downloads are available, choose `Seminarly-AppleSilicon.dmg` for an M-series Mac or `Seminarly-Intel.dmg` for an Intel Mac. Both include ChatGPT sign-in. The larger `Seminarly.dmg` works on either and remains available for older in-app update links. Newer app versions select the native download automatically.
+
+To build from source instead:
+
 ```bash
 git clone https://github.com/daniellee-ux/Seminarly-AI.git
 cd Seminarly-AI
@@ -32,7 +38,7 @@ Grant permissions when prompted:
 
 ### 3. Connect your AI provider
 
-Open **Settings** (gear icon) → **AI Provider**. Choose **ChatGPT (Beta)**, click **Sign in with ChatGPT**, and finish signing in in your browser. Everything needed is included with Seminarly: no terminal, extra installation, or API key. Your plan's usage limits and workspace restrictions apply; see [setup and limitations](docs/chatgpt-plan.md).
+Open **Settings** (gear icon) → **AI Provider**. Choose **ChatGPT (Beta)**, click **Sign in with ChatGPT**, and finish signing in in your browser. Seminarly automatically prepares a verified connection component on first use, with progress and cancel/retry controls. No terminal, manual installation, or API key is needed. The component is cached across app updates. Your plan's usage limits and workspace restrictions apply; see [setup and limitations](docs/chatgpt-plan.md).
 
 Alternatively, choose an API provider and paste its API key. Keys are stored in macOS Keychain and sent only to the selected provider for authentication. ChatGPT plan and OpenAI API are separate billing options; Seminarly never silently falls back to the paid API.
 

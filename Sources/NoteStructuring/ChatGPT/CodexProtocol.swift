@@ -118,11 +118,14 @@ struct ChatGPTRateLimitsResponse: Decodable, Sendable {
 
 enum ChatGPTError: LocalizedError, Sendable, Equatable {
     case runtimeMissing, runtimeTooOld, signedOut, invalidProtocol, connectionClosed, timedOut
+    case runtimeDownloadFailed, runtimeVerificationFailed
     case loginFailed, invalidLoginURL, rateLimited, contextTooLong, generationFailed, toolsDisabled, privacyUnavailable
 
     var errorDescription: String? {
         switch self {
-        case .runtimeMissing: "Seminarly's ChatGPT connection component is missing or damaged. Reinstall the latest Seminarly and try again."
+        case .runtimeMissing: "Sign in with ChatGPT to prepare Seminarly's connection."
+        case .runtimeDownloadFailed: "Couldn't prepare ChatGPT. Check your internet connection and click Sign in with ChatGPT to retry."
+        case .runtimeVerificationFailed: "The ChatGPT download couldn't be verified and wasn't opened. Click Sign in with ChatGPT to download it again."
         case .runtimeTooOld: "Update Seminarly to reconnect to ChatGPT."
         case .signedOut: "Connect your ChatGPT account in Settings to generate notes."
         case .invalidProtocol: "The ChatGPT connection needs an update. Update Seminarly and try again."

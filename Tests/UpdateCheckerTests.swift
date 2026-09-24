@@ -7,9 +7,11 @@ final class UpdateCheckerTests: XCTestCase {
         tag: String,
         name: String? = nil,
         body: String? = nil,
-        htmlURL: String = "https://github.com/daniellee-ux/Seminarly-AI/releases/tag/x"
+        htmlURL: String = "https://github.com/daniellee-ux/Seminarly-AI/releases/tag/x",
+        assets: [String] = []
     ) -> GitHubRelease {
-        GitHubRelease(tagName: tag, name: name, body: body, htmlURL: htmlURL)
+        GitHubRelease(tagName: tag, name: name, body: body, htmlURL: htmlURL,
+                      assets: assets.map { GitHubReleaseAsset(name: $0) })
     }
 
     // MARK: - GitHubRelease decoding
@@ -24,7 +26,7 @@ final class UpdateCheckerTests: XCTestCase {
           "prerelease": false,
           "draft": false,
           "id": 12345,
-          "assets": []
+          "assets": [{ "name": "Seminarly-AppleSilicon.dmg", "browser_download_url": "https://example.com/ignored" }]
         }
         """.data(using: .utf8)!
 
@@ -33,6 +35,7 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(release.name, "Release v0.1.2")
         XCTAssertEqual(release.htmlURL, "https://github.com/daniellee-ux/Seminarly-AI/releases/tag/v0.1.2")
         XCTAssertEqual(release.body, "## What's new\n- Fixed a crash")
+        XCTAssertEqual(release.assets.map(\.name), ["Seminarly-AppleSilicon.dmg"])
     }
 
     func testDecodesPayloadWithNullOptionalFields() throws {
@@ -44,6 +47,7 @@ final class UpdateCheckerTests: XCTestCase {
         XCTAssertEqual(release.tagName, "v1.0.0")
         XCTAssertNil(release.name)
         XCTAssertNil(release.body)
+        XCTAssertTrue(release.assets.isEmpty)
     }
 
     // MARK: - evaluate(currentVersion:release:)
@@ -160,13 +164,54 @@ final class UpdateCheckerTests: XCTestCase {
 
     // MARK: - Download URL
 
-    func testDownloadURLPointsAtLatestAsset() {
-        // The Download button relies on GitHub's latest-asset redirect; guard the
-        // exact string (the constant is force-unwrapped, so a typo crashes at launch).
+    func testDownloadPrefersNativeInstallerAndPinsDisplayedRelease() {
+        let release = makeRelease(tag: "v0.1.12", assets: [
+            "Seminarly.dmg", "Seminarly-Intel.dmg", "Seminarly-AppleSilicon.dmg",
+        ])
         XCTAssertEqual(
-            UpdateChecker.downloadURL.absoluteString,
-            "https://github.com/daniellee-ux/Seminarly-AI/releases/latest/download/Seminarly.dmg"
+            UpdateChecker.downloadURL(for: release, architecture: .appleSilicon).absoluteString,
+            "https://github.com/daniellee-ux/Seminarly-AI/releases/download/v0.1.12/Seminarly-AppleSilicon.dmg"
         )
+        XCTAssertEqual(
+            UpdateChecker.downloadURL(for: release, architecture: .intel).absoluteString,
+            "https://github.com/daniellee-ux/Seminarly-AI/releases/download/v0.1.12/Seminarly-Intel.dmg"
+        )
+    }
+
+    func testDownloadFallsBackToUniversalForOlderReleases() {
+        let release = makeRelease(tag: "v0.1.11", assets: ["Seminarly.dmg"])
+        for architecture: ReleaseArchitecture in [.appleSilicon, .intel] {
+            XCTAssertEqual(UpdateChecker.downloadURL(for: release, architecture: architecture).absoluteString,
+                           "https://github.com/daniellee-ux/Seminarly-AI/releases/download/v0.1.11/Seminarly.dmg")
+        }
+    }
+
+    func testMissingNativeAssetUsesUniversalNotOtherCPU() {
+        let release = makeRelease(tag: "v0.1.12", assets: ["Seminarly-Intel.dmg", "Seminarly.dmg"])
+        XCTAssertTrue(UpdateChecker.downloadURL(for: release, architecture: .appleSilicon)
+            .absoluteString.hasSuffix("/v0.1.12/Seminarly.dmg"))
+    }
+
+    func testMissingCompatibleAssetOpensReleasePage() {
+        let release = makeRelease(tag: "v0.1.12", assets: ["Seminarly-Intel.dmg"])
+        XCTAssertEqual(UpdateChecker.downloadURL(for: release, architecture: .appleSilicon),
+                       UpdateChecker.releasesPageURL)
+        XCTAssertEqual(UpdateChecker.downloadURL(for: makeRelease(tag: "v0.1.12")),
+                       UpdateChecker.releasesPageURL)
+    }
+
+    func testUntrustedReleaseURLsAndMalformedTagsAreNotOpened() {
+        let release = makeRelease(tag: "v0.1.12", htmlURL: "file:///private/untrusted",
+                                  assets: ["Seminarly.dmg"])
+        XCTAssertEqual(UpdateChecker.downloadURL(for: release).host, "github.com")
+        XCTAssertEqual(UpdateChecker.downloadURL(for: makeRelease(tag: "../../bad", assets: ["Seminarly.dmg"])),
+                       UpdateChecker.releasesPageURL)
+    }
+
+    func testRosettaDownloadsNativeAppleSiliconInstaller() {
+        XCTAssertEqual(ReleaseArchitecture.detect(isARMProcess: true, isTranslated: false), .appleSilicon)
+        XCTAssertEqual(ReleaseArchitecture.detect(isARMProcess: false, isTranslated: true), .appleSilicon)
+        XCTAssertEqual(ReleaseArchitecture.detect(isARMProcess: false, isTranslated: false), .intel)
     }
 
     // MARK: - UpdateSettings.isDue (pure timing)

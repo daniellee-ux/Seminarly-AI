@@ -5,18 +5,8 @@ enum CodexRuntime {
     static let automaticModel = "automatic"
     static let permissionProfile = "seminarly-notes"
 
-    /// Always use the version shipped and signed with Seminarly. A global CLI or a
-    /// saved executable preference from the earlier Beta must not change this runtime.
-    static func executable(in bundleURL: URL = Bundle.main.bundleURL) -> URL? {
-        let url = bundleURL.appendingPathComponent("Contents/Helpers/seminarly-chatgpt")
-        guard FileManager.default.isExecutableFile(atPath: url.path),
-              let attributes = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
-              attributes.isRegularFile == true, attributes.isSymbolicLink != true else { return nil }
-        return url
-    }
-
-    static func configuration() throws -> CodexLaunchConfiguration {
-        guard let executable = executable() else { throw ChatGPTError.runtimeMissing }
+    /// Only callers holding a checksum/signature-verified cached runtime may launch it.
+    static func configuration(executable: URL) throws -> CodexLaunchConfiguration {
         let fm = FileManager.default
         let support = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         let profile = support.appendingPathComponent("ai.seminarly/ChatGPT", isDirectory: true)
@@ -51,7 +41,7 @@ enum CodexRuntime {
             .map { "features.\($0)=false" }
         return CodexLaunchConfiguration(
             executable: executable,
-            // The bundled binary is the standalone App Server, not the terminal CLI.
+            // The private binary is the standalone App Server, not the terminal CLI.
             arguments: settings.flatMap { ["-c", $0] } + ["--listen", "stdio://"],
             environment: environment, workingDirectory: work, removesWorkingDirectoryOnExit: true
         )

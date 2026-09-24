@@ -10,18 +10,34 @@ final class ChatGPTAccountStore: ObservableObject {
     @Published private(set) var pendingLogin: ChatGPTLogin?
     @Published private(set) var isWorking = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var preparation: ChatGPTPreparation?
 
     private var operation: Task<Void, Never>?
     private var operationID: UUID?
     private var accountClient: CodexAppServerClient?
     private var generations: [UUID: CodexAppServerClient] = [:]
     private var accountGeneration = 0
-    private let configuration: @MainActor () throws -> CodexLaunchConfiguration
+    private let configuration: @MainActor () async throws -> CodexLaunchConfiguration
+    private let prepareRuntime: @MainActor (@escaping ChatGPTRuntimeInstaller.Progress) async throws -> Void
     private let openURL: @MainActor (URL) -> Void
 
     init(configuration: (@MainActor () throws -> CodexLaunchConfiguration)? = nil,
+         prepareRuntime: (@MainActor (@escaping ChatGPTRuntimeInstaller.Progress) async throws -> Void)? = nil,
          openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }) {
-        self.configuration = configuration ?? { try CodexRuntime.configuration() }
+        if let configuration {
+            self.configuration = { try configuration() }
+            self.prepareRuntime = prepareRuntime ?? { _ in }
+        } else {
+            self.configuration = {
+                guard let executable = try await ChatGPTRuntimeInstaller.shared.installed(manifest: ChatGPTRuntimeManifest.load()) else {
+                    throw ChatGPTError.runtimeMissing
+                }
+                return try CodexRuntime.configuration(executable: executable)
+            }
+            self.prepareRuntime = prepareRuntime ?? { progress in
+                _ = try await ChatGPTRuntimeInstaller.shared.prepare(manifest: ChatGPTRuntimeManifest.load(), progress: progress)
+            }
+        }
         self.openURL = openURL
     }
 
@@ -30,12 +46,12 @@ final class ChatGPTAccountStore: ObservableObject {
 
     func refresh() {
         guard !isWorking else { return }
-        run { store, client, _ in try await store.readAccount(client) }
+        run(ignoreMissingRuntime: true) { store, client, _ in try await store.readAccount(client) }
     }
 
     func signIn(deviceCode: Bool = false) {
         guard !isWorking, generations.isEmpty else { return }
-        run { store, client, _ in
+        run(prepareConnection: true) { store, client, _ in
             let result = try await client.request("account/login/start", params: .object(deviceCode ?
                 ["type": .string("chatgptDeviceCode")] :
                 ["type": .string("chatgpt"), "useHostedLoginSuccessPage": .bool(true), "appBrand": .string("chatgpt")]),
@@ -104,7 +120,7 @@ final class ChatGPTAccountStore: ObservableObject {
         }
     }
 
-    private func run(clearAccountOnFailure: Bool = true,
+    private func run(clearAccountOnFailure: Bool = true, prepareConnection: Bool = false, ignoreMissingRuntime: Bool = false,
                      _ action: @escaping @MainActor (ChatGPTAccountStore, CodexAppServerClient, CodexLaunchConfiguration) async throws -> Void) {
         let id = UUID()
         operationID = id
@@ -117,18 +133,31 @@ final class ChatGPTAccountStore: ObservableObject {
                 if operationID == id {
                     isWorking = false
                     pendingLogin = nil
+                    preparation = nil
                     accountClient = nil
                     operation = nil
                 }
             }
             do {
-                let config = try configuration()
+                if prepareConnection {
+                    preparation = .verifying
+                    try await prepareRuntime { [weak self] progress in
+                        Task { @MainActor in
+                            guard let self, self.operationID == id, self.preparation != nil else { return }
+                            self.preparation = progress
+                        }
+                    }
+                    preparation = nil
+                }
+                try Task.checkCancellation()
+                let config = try await configuration()
                 try await client.start(config)
                 try await action(self, client, config)
                 try Task.checkCancellation()
             } catch {
                 if !Task.isCancelled {
-                    errorMessage = Self.safeError(error).localizedDescription
+                    errorMessage = ignoreMissingRuntime && (error as? ChatGPTError) == .runtimeMissing
+                        ? nil : Self.safeError(error).localizedDescription
                     // Failed validation must not leave an apparently usable stale account.
                     if clearAccountOnFailure {
                         account = nil
@@ -179,7 +208,7 @@ final class ChatGPTAccountStore: ObservableObject {
         generations[id] = client
         defer { generations[id] = nil }
         do {
-            let config = try configuration()
+            let config = try await configuration()
             try await client.start(config)
             let result = try await ChatGPTNoteProvider().send(client: client, workingDirectory: config.workingDirectory,
                                                             systemPrompt: systemPrompt, userPrompt: userPrompt, model: model, template: template)

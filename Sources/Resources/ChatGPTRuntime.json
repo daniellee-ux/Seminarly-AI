@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "version": "0.156.1",
+  "revision": 1,
+  "teamIdentifier": "ZPW87426K2",
+  "artifacts": [
+    {
+      "architecture": "arm64",
+      "url": "https://github.com/daniellee-ux/Seminarly-AI/releases/download/v0.1.12/ChatGPTConnection-0.156.1-1-arm64.tar.xz",
+      "archiveSHA256": "f756730753091f7d339259ca8fd19c96536cc8d56704fb148fed71315d6e2326",
+      "archiveBytes": 43904964,
+      "executableSHA256": "c3eecd1f8a250829db4ea2a0021bb545ea10c8199a6ab00a704cbff1ecf202a5",
+      "executableBytes": 183123776
+    },
+    {
+      "architecture": "x86_64",
+      "url": "https://github.com/daniellee-ux/Seminarly-AI/releases/download/v0.1.12/ChatGPTConnection-0.156.1-1-x86_64.tar.xz",
+      "archiveSHA256": "0e9535cf9320f14d879082984ca67d2024dfa9fe3463369c67365c51962fb0aa",
+      "archiveBytes": 52256096,
+      "executableSHA256": "81421d1360c8236bc09cf8b04b7cb06774f5cc73ad90997edcc563247c4be1c2",
+      "executableBytes": 197647152
+    }
+  ]
+}
