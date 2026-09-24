@@ -24,6 +24,7 @@
 		264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */; };
 		26E009AD005BE831D60E27B9 /* ProcessTapManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */; };
 		26E4E5A7E3B2D3070D6B9A6E /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = F2AF1A0A68A664AA851E1EC5 /* WhisperKit */; };
+		2C4F8D5F68470E05EBC7D9B8 /* fake-codex.py in Resources */ = {isa = PBXBuildFile; fileRef = 68F988157305BE68364FD202 /* fake-codex.py */; };
 		2CE8C9C10E6672A11C0C63DD /* AudioBufferAccumulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A0535A24CD213346912417B /* AudioBufferAccumulatorTests.swift */; };
 		30853DF6249D05C969434F0E /* LLMProviderCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 723F4C91D76B4357C6B9ECAC /* LLMProviderCatalog.swift */; };
 		3086DF2F96EE20D942903C43 /* SessionFormatterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */; };
@@ -38,9 +39,11 @@
 		45A19BA13654C5D30DDA98AC /* SummaryLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */; };
 		46177C81A0C684777B7808E3 /* ListCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E102078703CD4DAD162330 /* ListCommand.swift */; };
 		471872393F8D54858CA48CBA /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 220744F42A1788F0FE2D6AB4 /* SettingsView.swift */; };
+		4C3F72B8A645025341D1B277 /* ChatGPTTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10136CDBA72ACACC7055F7D /* ChatGPTTests.swift */; };
 		4D58D1C0B0D2F7FC64EF927C /* LLMProviderCatalogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF58A59895428D2591DB58F5 /* LLMProviderCatalogTests.swift */; };
 		4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */; };
 		4E747E200CB180C9D52D7681 /* LLMSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B44FEA6BC39BCDB826FD57 /* LLMSettings.swift */; };
+		4F5E3E3582239412862DCC49 /* CodexProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */; };
 		569391AC2571A5DDBA8BEEFF /* NoteTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10363E60B17A3874C19B4B56 /* NoteTemplate.swift */; };
 		588808A26C68718D3CF6A823 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582B18F272268549F5F54328 /* Assets.xcassets */; };
 		58A1066578E3E85A2DE1DF84 /* MFCCExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 28C64713853656F00D7A62D6 /* MFCCExtractor.swift */; };
@@ -49,6 +52,7 @@
 		5D575900834D5BCF53268A4E /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C52021159AD95599C2F300B /* FluidAudio */; };
 		5FAA8C7258B4629E2C8019D5 /* MenuBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10A19149E4315F1EE72FF60 /* MenuBarView.swift */; };
 		65DEB4C997A0C3A40B4A23B6 /* NoteStructuringService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBBA48EA2C66AE1B3901CFC6 /* NoteStructuringService.swift */; };
+		6BBB3094B37031D03147F845 /* CodexAppServerClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89274FD20CD968F01BFB40A8 /* CodexAppServerClient.swift */; };
 		704C5754CB70D942B47619EE /* AnthropicProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 540D080ABEAE8EB2DB0A4FFD /* AnthropicProvider.swift */; };
 		71BBC281CAFAAB465CFFD11D /* SpeakerClustererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11806D2BF8280456123BD8CF /* SpeakerClustererTests.swift */; };
 		722F05C369A378C252BCB483 /* AudioFormatConverter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F92D33D3963F33E09094FB5 /* AudioFormatConverter.swift */; };
@@ -63,6 +67,7 @@
 		7AC0C3A6C796C64F38A2FB0F /* MeetingMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */; };
 		7AD44302DF496F6B77A37973 /* NoteTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10363E60B17A3874C19B4B56 /* NoteTemplate.swift */; };
 		7B16FFB9C8F57C1E389726A5 /* SummaryLanguageSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C5EE274C41C3DBC014507E4 /* SummaryLanguageSettings.swift */; };
+		7D0F561198B27D0102C3EEF3 /* CodexRuntime.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4AD965F3C181681469DF1C2 /* CodexRuntime.swift */; };
 		7F6ECAB295412F8B8FBE15A3 /* TranscriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35150228257E97CD1838BB43 /* TranscriptTests.swift */; };
 		8194694358B9DF2867262DB8 /* MeetingMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */; };
 		83C146EB7D8F883BD986499D /* DiarizationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */; };
@@ -74,11 +79,13 @@
 		951D8253B5BC39334B34C852 /* SeminarlySchemaV1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 170D2276B45EE3998B383BA2 /* SeminarlySchemaV1.swift */; };
 		991A2C2E4DC17237C6EDF5FD /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D769202B0B31CAEBB6CDF131 /* GeminiProvider.swift */; };
 		9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */; };
+		9F9D4CF21B60C9790B042211 /* NoteOutputSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = E428EB031BD99240D5B6143D /* NoteOutputSchema.swift */; };
 		AC5416D24451304BF72017EC /* DiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFE1DF556BD19A1EB3CFF0D /* DiarizationEngine.swift */; };
 		B2FCCA19C9AE9C0FBCEE5FBF /* MeetingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D49402F0591D85B1801210 /* MeetingModelTests.swift */; };
 		B490BDB123CAC48F2DDB3854 /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0900F6D8B02A754E92F02C9E /* TranscriptionEngine.swift */; };
 		B844B878FA9CC82CC348D091 /* CoreAudioUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88870F818336A1C4677C1657 /* CoreAudioUtils.swift */; };
 		BA3EF45D20C4CD45A137D6B0 /* MarkdownListPrefixTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4373F8BD4EEDAE9A4E7B5D60 /* MarkdownListPrefixTests.swift */; };
+		C3EE91BD256570874016542D /* ChatGPTAccountStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D362AE710CD761B295AFE01E /* ChatGPTAccountStore.swift */; };
 		C58818FB8C29B6BEC7353882 /* DatabaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */; };
 		C6372F6144CBCC2F3FED70D1 /* AudioCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60EC4D05F182BD3B566B8B6A /* AudioCaptureManager.swift */; };
 		CAFC5F5320BF0383A2E99288 /* SKILL.md in CopyFiles */ = {isa = PBXBuildFile; fileRef = ADB62F2B16B3B5F970154451 /* SKILL.md */; };
@@ -86,7 +93,9 @@
 		CF1248057656049AD51D9F78 /* DatabaseRecoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */; };
 		D0E3FECE30E61AF212F99CF5 /* DatabaseStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */; };
 		D46F3FAED328DFD92EAFB3A1 /* seminarly-cli in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = F5C0129D5E06AEF21E0DE97E /* seminarly-cli */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		DB096F9DE35B7686AACD536D /* ChatGPTNoteProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A64F2E12B28E0793C7DAFDD /* ChatGPTNoteProvider.swift */; };
 		DC0B405D28FFBEDDE284A205 /* GetCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D26185876B64E5A4D977EC7 /* GetCommand.swift */; };
+		DC60598861578C3674737D0E /* ChatGPTSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1263C55DF450216AC061F5F6 /* ChatGPTSettingsSection.swift */; };
 		DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */; };
 		E90A53D5B14AAAF64AC05CB2 /* DatabaseCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */; };
 		EAACDE7F9E587D612B126BEF /* LLMProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442C1A5FDC026A3F72D52856 /* LLMProvider.swift */; };
@@ -157,6 +166,7 @@
 		0D31F0D336330A248D7E9EF8 /* SpeakerEmbedding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerEmbedding.swift; sourceTree = "<group>"; };
 		10363E60B17A3874C19B4B56 /* NoteTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTemplate.swift; sourceTree = "<group>"; };
 		11806D2BF8280456123BD8CF /* SpeakerClustererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerClustererTests.swift; sourceTree = "<group>"; };
+		1263C55DF450216AC061F5F6 /* ChatGPTSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTSettingsSection.swift; sourceTree = "<group>"; };
 		170D2276B45EE3998B383BA2 /* SeminarlySchemaV1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlySchemaV1.swift; sourceTree = "<group>"; };
 		1893FC5504CE291132F1E35C /* SessionFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFormatter.swift; sourceTree = "<group>"; };
 		189EE3B1745B331CE700A4FC /* SessionLookup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLookup.swift; sourceTree = "<group>"; };
@@ -185,17 +195,21 @@
 		588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
 		60EC4D05F182BD3B566B8B6A /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
 		627114C6B0F93E94EBD12D95 /* OpenAICompatibleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleProvider.swift; sourceTree = "<group>"; };
+		68F988157305BE68364FD202 /* fake-codex.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = "fake-codex.py"; sourceTree = "<group>"; };
 		6C5EE274C41C3DBC014507E4 /* SummaryLanguageSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguageSettings.swift; sourceTree = "<group>"; };
 		6E6B0D4DED1E6ADE924CAF89 /* SeminarlyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SeminarlyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F10E3BAEBD75EA5F07B6D45 /* PathCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PathCommand.swift; sourceTree = "<group>"; };
 		708F89D50651B27D9BE23137 /* UpdateSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettings.swift; sourceTree = "<group>"; };
 		723F4C91D76B4357C6B9ECAC /* LLMProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMProviderCatalog.swift; sourceTree = "<group>"; };
 		7A1ADE195415707A7D45D383 /* CodableModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableModelTests.swift; sourceTree = "<group>"; };
+		7A64F2E12B28E0793C7DAFDD /* ChatGPTNoteProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTNoteProvider.swift; sourceTree = "<group>"; };
 		7DBC9152ACCA52E023313C17 /* MeetingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetailView.swift; sourceTree = "<group>"; };
 		830845872D8058AC0DE9E6A4 /* TranscriptionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionEngineTests.swift; sourceTree = "<group>"; };
 		853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseCheckpoint.swift; sourceTree = "<group>"; };
 		874DB0735B5E685D1D7F5BB0 /* TranscriptionLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguageTests.swift; sourceTree = "<group>"; };
+		88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProtocol.swift; sourceTree = "<group>"; };
 		88870F818336A1C4677C1657 /* CoreAudioUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAudioUtils.swift; sourceTree = "<group>"; };
+		89274FD20CD968F01BFB40A8 /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerClient.swift; sourceTree = "<group>"; };
 		8C186469B8F8014AFC557D7D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		8D26185876B64E5A4D977EC7 /* GetCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetCommand.swift; sourceTree = "<group>"; };
 		8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneCaptureManager.swift; sourceTree = "<group>"; };
@@ -212,8 +226,10 @@
 		AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioDetectionBanner.swift; sourceTree = "<group>"; };
 		ADB62F2B16B3B5F970154451 /* SKILL.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = SKILL.md; sourceTree = "<group>"; };
 		AFAA2D60D88632622450199D /* SeminarlyCLIInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLIInstaller.swift; sourceTree = "<group>"; };
+		B10136CDBA72ACACC7055F7D /* ChatGPTTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTTests.swift; sourceTree = "<group>"; };
 		B10A19149E4315F1EE72FF60 /* MenuBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarView.swift; sourceTree = "<group>"; };
 		B26F524C1163EE6BDC43E4DB /* DatabaseStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseStore.swift; sourceTree = "<group>"; };
+		B4AD965F3C181681469DF1C2 /* CodexRuntime.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexRuntime.swift; sourceTree = "<group>"; };
 		BA68520F74553000BE94F18A /* KeychainStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStoreTests.swift; sourceTree = "<group>"; };
 		BB7EFEC64A836FC701F31232 /* TemplateSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateSettings.swift; sourceTree = "<group>"; };
 		BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguageTests.swift; sourceTree = "<group>"; };
@@ -221,11 +237,13 @@
 		BDB4BD26226E2159D5AF74B7 /* LLMResponseSanitizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMResponseSanitizerTests.swift; sourceTree = "<group>"; };
 		C662AA5020C9B439FCD1EFDB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C76EB55618FE8289799D46EB /* MarkdownNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownNoteEditor.swift; sourceTree = "<group>"; };
+		D362AE710CD761B295AFE01E /* ChatGPTAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTAccountStore.swift; sourceTree = "<group>"; };
 		D36EDF8A615F3BD8381DAB86 /* SearchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCommand.swift; sourceTree = "<group>"; };
 		D460CF4363C70841D56B72D9 /* SemanticVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersion.swift; sourceTree = "<group>"; };
 		D769202B0B31CAEBB6CDF131 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationEngineTests.swift; sourceTree = "<group>"; };
 		DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFormatterTests.swift; sourceTree = "<group>"; };
+		E428EB031BD99240D5B6143D /* NoteOutputSchema.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteOutputSchema.swift; sourceTree = "<group>"; };
 		E54F1906243B01FFCE252E00 /* MeetingMarkdownRendererTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingMarkdownRendererTests.swift; sourceTree = "<group>"; };
 		E7B44FEA6BC39BCDB826FD57 /* LLMSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSettings.swift; sourceTree = "<group>"; };
 		E8FA98217C86529B02229D39 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
@@ -262,6 +280,19 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		11B27EE9859AF8A1F82B64ED /* ChatGPT */ = {
+			isa = PBXGroup;
+			children = (
+				D362AE710CD761B295AFE01E /* ChatGPTAccountStore.swift */,
+				7A64F2E12B28E0793C7DAFDD /* ChatGPTNoteProvider.swift */,
+				89274FD20CD968F01BFB40A8 /* CodexAppServerClient.swift */,
+				88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */,
+				B4AD965F3C181681469DF1C2 /* CodexRuntime.swift */,
+				E428EB031BD99240D5B6143D /* NoteOutputSchema.swift */,
+			);
+			path = ChatGPT;
+			sourceTree = "<group>";
+		};
 		12F3CE12A8C38ED820F8D203 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -404,12 +435,22 @@
 			path = Transcription;
 			sourceTree = "<group>";
 		};
+		BF285F590CD11531CD73780D /* Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				68F988157305BE68364FD202 /* fake-codex.py */,
+			);
+			path = Fixtures;
+			sourceTree = "<group>";
+		};
 		E917972C36E6B43A1C972A0D /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				BF285F590CD11531CD73780D /* Fixtures */,
 				903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */,
 				1A0535A24CD213346912417B /* AudioBufferAccumulatorTests.swift */,
 				A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */,
+				B10136CDBA72ACACC7055F7D /* ChatGPTTests.swift */,
 				7A1ADE195415707A7D45D383 /* CodableModelTests.swift */,
 				9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */,
 				D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */,
@@ -442,6 +483,7 @@
 			isa = PBXGroup;
 			children = (
 				AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */,
+				1263C55DF450216AC061F5F6 /* ChatGPTSettingsSection.swift */,
 				8C186469B8F8014AFC557D7D /* ContentView.swift */,
 				08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */,
 				BC1C13C784D22EA6892736BF /* DesignSystem.swift */,
@@ -470,6 +512,7 @@
 		F8D83E9D011B972EE7C14FC1 /* NoteStructuring */ = {
 			isa = PBXGroup;
 			children = (
+				11B27EE9859AF8A1F82B64ED /* ChatGPT */,
 				68B369DF17E4B9D977C8411B /* Providers */,
 				26924E0209A1D9E8A3CAD208 /* EnhancementCoordinator.swift */,
 				E8FA98217C86529B02229D39 /* KeychainStore.swift */,
@@ -495,6 +538,7 @@
 			buildConfigurationList = D7FCF8CA5B77A417851D5F2E /* Build configuration list for PBXNativeTarget "SeminarlyTests" */;
 			buildPhases = (
 				2B48805CAE598D7AC01B123F /* Sources */,
+				EFAFCA907B9EBF57A38F8990 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -587,6 +631,14 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		EFAFCA907B9EBF57A38F8990 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2C4F8D5F68470E05EBC7D9B8 /* fake-codex.py in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		FFCEC2F1A87CC8929336FC44 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -605,6 +657,7 @@
 				4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */,
 				2CE8C9C10E6672A11C0C63DD /* AudioBufferAccumulatorTests.swift in Sources */,
 				08F978A443863CEEB70C3926 /* AudioFormatConverterTests.swift in Sources */,
+				4C3F72B8A645025341D1B277 /* ChatGPTTests.swift in Sources */,
 				31388B68A62FAF9939159BAB /* CodableModelTests.swift in Sources */,
 				CF1248057656049AD51D9F78 /* DatabaseRecoveryTests.swift in Sources */,
 				83C146EB7D8F883BD986499D /* DiarizationEngineTests.swift in Sources */,
@@ -662,6 +715,12 @@
 				138FDF555692413FC5D0AE68 /* AudioDetectionBanner.swift in Sources */,
 				722F05C369A378C252BCB483 /* AudioFormatConverter.swift in Sources */,
 				313A89CDA957292C8B30F23A /* AudioSourceMonitor.swift in Sources */,
+				C3EE91BD256570874016542D /* ChatGPTAccountStore.swift in Sources */,
+				DB096F9DE35B7686AACD536D /* ChatGPTNoteProvider.swift in Sources */,
+				DC60598861578C3674737D0E /* ChatGPTSettingsSection.swift in Sources */,
+				6BBB3094B37031D03147F845 /* CodexAppServerClient.swift in Sources */,
+				4F5E3E3582239412862DCC49 /* CodexProtocol.swift in Sources */,
+				7D0F561198B27D0102C3EEF3 /* CodexRuntime.swift in Sources */,
 				176988E4F55C6A8E90D6C1AA /* ContentView.swift in Sources */,
 				B844B878FA9CC82CC348D091 /* CoreAudioUtils.swift in Sources */,
 				3F35DD165E15227BC2979789 /* DatabaseCheckpoint.swift in Sources */,
@@ -683,6 +742,7 @@
 				5FAA8C7258B4629E2C8019D5 /* MenuBarView.swift in Sources */,
 				F4BE19DE6E6463E692E9DFB8 /* MicrophoneCaptureManager.swift in Sources */,
 				02BED202E990079CF123CB89 /* NeuralDiarizationEngine.swift in Sources */,
+				9F9D4CF21B60C9790B042211 /* NoteOutputSchema.swift in Sources */,
 				65DEB4C997A0C3A40B4A23B6 /* NoteStructuringService.swift in Sources */,
 				569391AC2571A5DDBA8BEEFF /* NoteTemplate.swift in Sources */,
 				F99B6713863C741BBF7230BA /* NotepadSurface.swift in Sources */,
@@ -867,14 +927,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
@@ -890,14 +950,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.9;
+				MARKETING_VERSION = 0.1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;

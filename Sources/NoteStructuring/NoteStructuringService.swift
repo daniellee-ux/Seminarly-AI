@@ -86,13 +86,7 @@ final class NoteStructuringService: ObservableObject {
         let descriptor = LLMSettings.shared.currentDescriptor
         let model = LLMSettings.shared.currentModel
 
-        guard let apiKey = KeychainStore.load(for: descriptor.keychainAccount), !apiKey.isEmpty else {
-            errorMessage = LLMProviderError.noAPIKey(providerDisplayName: descriptor.displayName).localizedDescription
-            return nil
-        }
-
         let resolvedSummaryLanguage = SummaryLanguage.resolvedForTranscript(summaryLanguage, transcript: transcript)
-        let provider = makeProvider(for: descriptor)
         let systemPrompt = PromptTemplates.systemPrompt(for: template, summaryLanguage: resolvedSummaryLanguage)
         let userPrompt = PromptTemplates.structureNotes(
             transcript: transcript,
@@ -102,11 +96,11 @@ final class NoteStructuringService: ObservableObject {
         )
 
         do {
-            let responseText = try await provider.send(
+            let responseText = try await send(
+                descriptor: descriptor, template: template,
                 systemPrompt: systemPrompt,
                 userPrompt: userPrompt,
-                model: model,
-                apiKey: apiKey
+                model: model
             )
             return decodeNote(
                 from: responseText,
@@ -133,13 +127,7 @@ final class NoteStructuringService: ObservableObject {
         let descriptor = LLMSettings.shared.currentDescriptor
         let model = LLMSettings.shared.currentModel
 
-        guard let apiKey = KeychainStore.load(for: descriptor.keychainAccount), !apiKey.isEmpty else {
-            errorMessage = LLMProviderError.noAPIKey(providerDisplayName: descriptor.displayName).localizedDescription
-            return nil
-        }
-
         let resolvedSummaryLanguage = SummaryLanguage.resolvedForTranscript(summaryLanguage, transcript: transcript)
-        let provider = makeProvider(for: descriptor)
         let systemPrompt = PromptTemplates.enhanceSystemPrompt(for: template, summaryLanguage: resolvedSummaryLanguage)
         let userPrompt = PromptTemplates.enhanceWithUserNotes(
             userNotes: userNotes,
@@ -150,11 +138,11 @@ final class NoteStructuringService: ObservableObject {
         )
 
         do {
-            let responseText = try await provider.send(
+            let responseText = try await send(
+                descriptor: descriptor, template: template,
                 systemPrompt: systemPrompt,
                 userPrompt: userPrompt,
-                model: model,
-                apiKey: apiKey
+                model: model
             )
             return decodeNote(
                 from: responseText,
@@ -167,17 +155,26 @@ final class NoteStructuringService: ObservableObject {
         }
     }
 
-    var hasAPIKey: Bool {
-        KeychainStore.exists(for: LLMSettings.shared.currentDescriptor.keychainAccount)
-    }
-
     var currentProviderDisplayName: String {
         LLMSettings.shared.currentDescriptor.displayName
     }
 
     // MARK: - Helpers
 
-    private func makeProvider(for descriptor: LLMProviderDescriptor) -> LLMProvider {
+    private func send(descriptor: LLMProviderDescriptor, template: NoteTemplate,
+                      systemPrompt: String, userPrompt: String, model: String) async throws -> String {
+        if descriptor.kind == .chatGPTPlan {
+            return try await ChatGPTAccountStore.shared.generate(systemPrompt: systemPrompt, userPrompt: userPrompt,
+                                                                 model: model, template: template)
+        }
+        guard let apiKey = KeychainStore.load(for: descriptor.keychainAccount), !apiKey.isEmpty else {
+            throw LLMProviderError.noAPIKey(providerDisplayName: descriptor.displayName)
+        }
+        let provider = try makeProvider(for: descriptor)
+        return try await provider.send(systemPrompt: systemPrompt, userPrompt: userPrompt, model: model, apiKey: apiKey)
+    }
+
+    private func makeProvider(for descriptor: LLMProviderDescriptor) throws -> LLMProvider {
         switch descriptor.kind {
         case .anthropic:
             return AnthropicProvider(baseURL: descriptor.baseURL)
@@ -190,6 +187,8 @@ final class NoteStructuringService: ObservableObject {
             )
         case .gemini:
             return GeminiProvider(baseURLTemplate: descriptor.baseURL)
+        case .chatGPTPlan:
+            throw ChatGPTError.invalidProtocol // Managed sign-in never falls back to paid API calls.
         }
     }
 
@@ -226,30 +225,9 @@ final class NoteStructuringService: ObservableObject {
             )
             return (decoded.title, note)
         } catch {
-            let total = cleaned.count
-            let head = String(cleaned.prefix(250)).replacingOccurrences(of: "\n", with: " ")
-            let tail = String(cleaned.suffix(250)).replacingOccurrences(of: "\n", with: " ")
-            let detail = decodingErrorDetail(error)
-            errorMessage = "AI response could not be parsed (\(total) chars). \(detail) Start: \(head) … End: \(tail)"
+            // This message reaches UI and logs. Never include transcript-derived output.
+            errorMessage = "AI response could not be parsed. Please try again or choose another model."
             return nil
-        }
-    }
-
-    private func decodingErrorDetail(_ error: Error) -> String {
-        guard let decodingError = error as? DecodingError else {
-            return error.localizedDescription
-        }
-        switch decodingError {
-        case .dataCorrupted(let context):
-            return "JSON syntax error: \(context.debugDescription)"
-        case .keyNotFound(let key, let context):
-            return "Missing key '\(key.stringValue)' at \(context.codingPath.map(\.stringValue).joined(separator: "."))."
-        case .valueNotFound(_, let context):
-            return "Null value at \(context.codingPath.map(\.stringValue).joined(separator: "."))."
-        case .typeMismatch(_, let context):
-            return "Type mismatch at \(context.codingPath.map(\.stringValue).joined(separator: ".")): \(context.debugDescription)"
-        @unknown default:
-            return error.localizedDescription
         }
     }
 }

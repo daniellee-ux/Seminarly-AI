@@ -30,9 +30,11 @@ Grant permissions when prompted:
 - **Microphone** — to capture your voice
 - **Audio capture** — to tap other apps' audio (macOS 14.4+)
 
-### 3. Pick your AI provider and add an API key
+### 3. Connect your AI provider
 
-Open **Settings** (gear icon) → choose a provider in the **AI Provider** picker, then paste your API key for that provider. The key is stored in macOS Keychain (one entry per provider) and never leaves your device.
+Open **Settings** (gear icon) → **AI Provider**. Choose **ChatGPT plan (Beta)** to sign in with ChatGPT and use your plan's Codex allowance, without buying API credits. This requires an installed [Codex CLI](https://learn.chatgpt.com/docs/codex-cli) version **0.155.1 or later**; see [setup and limitations](docs/chatgpt-plan.md).
+
+Alternatively, choose an API provider and paste its API key. Keys are stored in macOS Keychain and sent only to the selected provider for authentication. ChatGPT plan and OpenAI API are separate billing options; Seminarly never silently falls back to the paid API.
 
 Default is **Anthropic Claude** ([console.anthropic.com](https://console.anthropic.com)). Other supported providers are listed below.
 
@@ -116,12 +118,13 @@ After the session, your notes appear in the detail view. You can edit them and c
 
 ## Supported AI Providers
 
-Pick whichever provider you have an API key for. Each is configured in **Settings → AI Provider** with its own key (stored separately in Keychain) and editable model field.
+Configure providers in **Settings → AI Provider**. ChatGPT uses managed sign-in and the account's model list; API providers use separate Keychain entries and editable model fields.
 
-| Provider | Default model | Where to get a key |
+| Provider | Default model | Authentication |
 |---|---|---|
 | **Anthropic Claude** *(default)* | `claude-sonnet-4-6` | [console.anthropic.com](https://console.anthropic.com) |
-| **OpenAI ChatGPT** | `gpt-5.5` | [platform.openai.com](https://platform.openai.com) |
+| **ChatGPT plan (Beta)** | Account default (discovered from Codex) | [ChatGPT sign-in](docs/chatgpt-plan.md); no API key |
+| **OpenAI API** | `gpt-5.5` | [platform.openai.com](https://platform.openai.com) |
 | **Google Gemini** | `gemini-3.1-flash-lite-preview` | [aistudio.google.com](https://aistudio.google.com) |
 | **xAI Grok** | `grok-4.20` | [console.x.ai](https://console.x.ai) |
 | **Moonshot Kimi** (international + China) | `kimi-k2.6` | [platform.moonshot.ai](https://platform.moonshot.ai) / [platform.moonshot.cn](https://platform.moonshot.cn) |
@@ -130,7 +133,7 @@ Pick whichever provider you have an API key for. Each is configured in **Setting
 | **DeepSeek** | `deepseek-v4-flash` | [platform.deepseek.com](https://platform.deepseek.com) |
 | **ByteDance Doubao** (China + International) | Endpoint ID (China) / `seed-1-8-251228` (Int'l) | [volcengine.com](https://www.volcengine.com) / [bytepluses.com](https://www.bytepluses.com) |
 
-Model field is editable so you can switch to any other model the provider supports.
+For API providers, the model field is editable so you can switch to another supported model.
 
 ---
 
@@ -156,7 +159,7 @@ Each note-generation call typically costs ~$0.02–0.04 on Claude Sonnet; compar
   - `medium` — good accuracy, ~1.5 GB RAM
   - `small` — usable for clear English, ~500 MB RAM
 - Xcode 16.3+ (matches `project.yml`)
-- An API key from one of the supported providers (see table above)
+- A ChatGPT account with Codex access and Codex CLI 0.155.1+, or an API key from a supported provider
 
 ---
 
@@ -170,7 +173,7 @@ Microphone  → AVAudioEngine  → 16kHz PCM ───────────�
                                                User Notes (optional)
                                                               ↓
                                               LLMProvider (selected)
-                                  Anthropic / OpenAI-compatible / Gemini
+                        ChatGPT (Codex App Server) / API providers
                                                               ↓
                                                      Structured Notes
                                                               ↓

@@ -17,7 +17,7 @@ final class LLMProviderCatalogTests: XCTestCase {
     func testCatalogContainsExpectedProviders() {
         let ids = Set(LLMProviderCatalog.all.map(\.id))
         let expected: Set<String> = [
-            "anthropic", "openai", "gemini", "grok",
+            "anthropic", "openai", "chatgpt-plan", "gemini", "grok",
             "kimi-intl", "kimi-cn", "zhipu", "minimax", "deepseek",
             "doubao-cn", "doubao-intl",
         ]

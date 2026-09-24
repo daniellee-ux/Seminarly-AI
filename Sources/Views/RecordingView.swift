@@ -317,9 +317,9 @@ struct RecordingView: View {
                 structuredNote: meeting.structuredNote,
                 isEditable: meeting.structuredNote == nil,
                 placeholderTitle: "No notes typed during recording",
-                placeholderSubtitle: enhancement.hasAPIKey
+                placeholderSubtitle: enhancement.isProviderReady
                     ? "Click Enhance to generate notes from the transcript"
-                    : "Add your \(enhancement.currentProviderDisplayName) API key in Settings to generate notes"
+                    : enhancement.providerSetupMessage
             )
             .overlay {
                 if enhancement.isEnhancing(meeting) {
@@ -415,12 +415,12 @@ struct RecordingView: View {
     private func enhanceButtonEnabled(for meeting: Meeting) -> Bool {
         guard let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
-              enhancement.hasAPIKey else { return false }
+              enhancement.isProviderReady else { return false }
         return true
     }
 
     private func enhanceHelpText(for meeting: Meeting) -> String {
-        if !enhancement.hasAPIKey { return "Add \(enhancement.currentProviderDisplayName) API key in Settings" }
+        if !enhancement.isProviderReady { return enhancement.providerSetupMessage }
         if meeting.transcript?.rawText.isEmpty ?? true { return "No transcript available" }
         return "Choose template and language, then generate structured notes"
     }
@@ -1199,7 +1199,7 @@ struct RecordingView: View {
         guard let meeting = savedMeeting,
               let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
-              enhancement.hasAPIKey else { return }
+              enhancement.isProviderReady else { return }
 
         let currentNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
         meeting.userNotesText = currentNotes.isEmpty ? nil : currentNotes

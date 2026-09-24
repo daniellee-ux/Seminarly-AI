@@ -103,7 +103,7 @@ struct MeetingDetailView: View {
 
                 Spacer()
 
-                if meeting.transcript != nil && meeting.structuredNote == nil && enhancement.hasAPIKey {
+                if meeting.transcript != nil && meeting.structuredNote == nil && enhancement.isProviderReady {
                     let generating = enhancement.isEnhancing(meeting)
                     Button {
                         enhanceSmart()
@@ -150,7 +150,7 @@ struct MeetingDetailView: View {
                         }
                     }
                     .buttonStyle(.plain)
-                    .disabled(generating || !enhancement.hasAPIKey)
+                    .disabled(generating || !enhancement.isProviderReady)
                     .help(generating
                         ? "Generating notes…"
                         : "Regenerate notes with a different template or language")
@@ -208,8 +208,8 @@ struct MeetingDetailView: View {
     }
 
     private var placeholderSubtitle: String? {
-        if !enhancement.hasAPIKey {
-            return "Add your \(enhancement.currentProviderDisplayName) API key in Settings to generate notes"
+        if !enhancement.isProviderReady {
+            return enhancement.providerSetupMessage
         }
         if meeting.transcript == nil || meeting.transcript?.rawText.isEmpty == true {
             return "No transcript available"

@@ -5,6 +5,7 @@ struct LLMProviderDescriptor: Identifiable, Sendable, Hashable {
         case anthropic
         case openAICompatible
         case gemini
+        case chatGPTPlan
     }
 
     let id: String
@@ -35,7 +36,7 @@ enum LLMProviderCatalog {
         ),
         LLMProviderDescriptor(
             id: "openai",
-            displayName: "OpenAI ChatGPT",
+            displayName: "OpenAI API",
             kind: .openAICompatible,
             baseURL: "https://api.openai.com/v1/chat/completions",
             defaultModel: "gpt-5.5",
@@ -44,6 +45,18 @@ enum LLMProviderCatalog {
             supportsJSONResponseFormat: true,
             requiresEndpointID: false,
             keychainAccount: "openai-api-key"
+        ),
+        LLMProviderDescriptor(
+            id: "chatgpt-plan",
+            displayName: "ChatGPT plan (Beta)",
+            kind: .chatGPTPlan,
+            baseURL: "stdio://",
+            defaultModel: CodexRuntime.automaticModel,
+            modelFieldLabel: "Model",
+            modelPlaceholder: "Account default",
+            supportsJSONResponseFormat: true,
+            requiresEndpointID: false,
+            keychainAccount: "chatgpt-plan-unused"
         ),
         LLMProviderDescriptor(
             id: "gemini",
