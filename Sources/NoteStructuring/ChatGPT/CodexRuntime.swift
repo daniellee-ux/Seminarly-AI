@@ -1,25 +1,22 @@
 import Foundation
 
 enum CodexRuntime {
-    static let executablePreference = "chatGPTCodexExecutable"
     static let minimumVersion = "0.155.1"
     static let automaticModel = "automatic"
     static let permissionProfile = "seminarly-notes"
 
-    static func executable(override: String? = nil) -> URL? {
-        let fm = FileManager.default
-        let home = fm.homeDirectoryForCurrentUser
-        // Finder-launched apps do not inherit a shell's PATH. Never invoke a login shell.
-        let candidates = override.map { [$0] } ?? [
-            home.appendingPathComponent(".local/bin/codex").path,
-            "/opt/homebrew/bin/codex", "/usr/local/bin/codex",
-            home.appendingPathComponent(".npm-global/bin/codex").path,
-        ]
-        return candidates.first { $0.hasPrefix("/") && fm.isExecutableFile(atPath: $0) }.map(URL.init(fileURLWithPath:))
+    /// Always use the version shipped and signed with Seminarly. A global CLI or a
+    /// saved executable preference from the earlier Beta must not change this runtime.
+    static func executable(in bundleURL: URL = Bundle.main.bundleURL) -> URL? {
+        let url = bundleURL.appendingPathComponent("Contents/Helpers/seminarly-chatgpt")
+        guard FileManager.default.isExecutableFile(atPath: url.path),
+              let attributes = try? url.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey]),
+              attributes.isRegularFile == true, attributes.isSymbolicLink != true else { return nil }
+        return url
     }
 
-    static func configuration(override: String? = nil) throws -> CodexLaunchConfiguration {
-        guard let executable = executable(override: override) else { throw ChatGPTError.runtimeMissing }
+    static func configuration() throws -> CodexLaunchConfiguration {
+        guard let executable = executable() else { throw ChatGPTError.runtimeMissing }
         let fm = FileManager.default
         let support = try fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         let profile = support.appendingPathComponent("ai.seminarly/ChatGPT", isDirectory: true)
@@ -36,7 +33,7 @@ enum CodexRuntime {
                               source: [String: String] = ProcessInfo.processInfo.environment) -> CodexLaunchConfiguration {
         var environment = source.filter { ["HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "__CF_USER_TEXT_ENCODING"].contains($0.key) }
         environment["CODEX_HOME"] = profile.path
-        environment["PATH"] = [executable.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"].joined(separator: ":")
+        environment["PATH"] = "/usr/bin:/bin"
         let settings = [
             "cli_auth_credentials_store=\"keyring\"", "forced_login_method=\"chatgpt\"",
             "model_provider=\"openai\"", "approval_policy=\"never\"",
@@ -54,7 +51,8 @@ enum CodexRuntime {
             .map { "features.\($0)=false" }
         return CodexLaunchConfiguration(
             executable: executable,
-            arguments: settings.flatMap { ["-c", $0] } + ["app-server", "--listen", "stdio://"],
+            // The bundled binary is the standalone App Server, not the terminal CLI.
+            arguments: settings.flatMap { ["-c", $0] } + ["--listen", "stdio://"],
             environment: environment, workingDirectory: work, removesWorkingDirectoryOnExit: true
         )
     }

@@ -28,6 +28,8 @@ for line in sys.stdin:
     elif method == "account/read":
         result = {"account": {"type": "chatgpt", "email": "test@example.com", "planType": "plus"} if authenticated else None}
     elif method == "account/login/start":
+        if scenario == "login-start-hangs":
+            continue
         result = {"type": params["type"], "loginId": "login-1"}
         if params["type"] == "chatgptDeviceCode":
             result.update(verificationUrl="https://auth.openai.com/codex/device", userCode="ABCD-1234")

@@ -107,6 +107,7 @@
 		F4BE19DE6E6463E692E9DFB8 /* MicrophoneCaptureManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */; };
 		F4BF0CF564D055F6ADE3C6E0 /* SpeakerClusterer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F73D72029CAF6F5076B1C642 /* SpeakerClusterer.swift */; };
 		F57EAE809EBF668AB080E535 /* SummaryLanguage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 572D28B5EDFB24B724697891 /* SummaryLanguage.swift */; };
+		F671EB8190192F20767461BC /* ChatGPTRuntimeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 878EAA7181BA021E3834ED38 /* ChatGPTRuntimeTests.swift */; };
 		F7078EF2EDACDA50E4D663BC /* TranscriptionLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 874DB0735B5E685D1D7F5BB0 /* TranscriptionLanguageTests.swift */; };
 		F890A2814F6503B4AB040C4B /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC1C13C784D22EA6892736BF /* DesignSystem.swift */; };
 		F8D591649E9948662F091233 /* LanguageAwareDiarizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */; };
@@ -207,6 +208,7 @@
 		830845872D8058AC0DE9E6A4 /* TranscriptionEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionEngineTests.swift; sourceTree = "<group>"; };
 		853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseCheckpoint.swift; sourceTree = "<group>"; };
 		874DB0735B5E685D1D7F5BB0 /* TranscriptionLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionLanguageTests.swift; sourceTree = "<group>"; };
+		878EAA7181BA021E3834ED38 /* ChatGPTRuntimeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTRuntimeTests.swift; sourceTree = "<group>"; };
 		88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProtocol.swift; sourceTree = "<group>"; };
 		88870F818336A1C4677C1657 /* CoreAudioUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAudioUtils.swift; sourceTree = "<group>"; };
 		89274FD20CD968F01BFB40A8 /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerClient.swift; sourceTree = "<group>"; };
@@ -450,6 +452,7 @@
 				903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */,
 				1A0535A24CD213346912417B /* AudioBufferAccumulatorTests.swift */,
 				A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */,
+				878EAA7181BA021E3834ED38 /* ChatGPTRuntimeTests.swift */,
 				B10136CDBA72ACACC7055F7D /* ChatGPTTests.swift */,
 				7A1ADE195415707A7D45D383 /* CodableModelTests.swift */,
 				9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */,
@@ -561,6 +564,7 @@
 				6080684F8D2514BC9511C046 /* CopyFiles */,
 				2E9EE3E063BEEE747B064B56 /* Frameworks */,
 				C2A1037BFE745AE647B1BA1D /* Embed Dependencies */,
+				4BFFE8635B398876838F0B63 /* Embed ChatGPT connection component */,
 			);
 			buildRules = (
 			);
@@ -649,6 +653,35 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		4BFFE8635B398876838F0B63 /* Embed ChatGPT connection component */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/scripts/embed-chatgpt-runtime.sh",
+				"$(SRCROOT)/scripts/lib/chatgpt-runtime.sh",
+				"$(SRCROOT)/scripts/chatgpt-runtime-origin.txt",
+			);
+			name = "Embed ChatGPT connection component";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/seminarly-chatgpt",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/LICENSE",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/NOTICE",
+				"$(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/ORIGIN.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "bash \"${SRCROOT}/scripts/embed-chatgpt-runtime.sh\"";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		2B48805CAE598D7AC01B123F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -657,6 +690,7 @@
 				4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */,
 				2CE8C9C10E6672A11C0C63DD /* AudioBufferAccumulatorTests.swift in Sources */,
 				08F978A443863CEEB70C3926 /* AudioFormatConverterTests.swift in Sources */,
+				F671EB8190192F20767461BC /* ChatGPTRuntimeTests.swift in Sources */,
 				4C3F72B8A645025341D1B277 /* ChatGPTTests.swift in Sources */,
 				31388B68A62FAF9939159BAB /* CodableModelTests.swift in Sources */,
 				CF1248057656049AD51D9F78 /* DatabaseRecoveryTests.swift in Sources */,
@@ -927,14 +961,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.10;
+				MARKETING_VERSION = 0.1.11;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;
@@ -950,14 +984,14 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 11;
+				CURRENT_PROJECT_VERSION = 12;
 				ENABLE_HARDENED_RUNTIME = YES;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = 0.1.10;
+				MARKETING_VERSION = 0.1.11;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.seminarly.Seminarly;
 				PRODUCT_NAME = Seminarly;
 				SDKROOT = macosx;

@@ -190,6 +190,20 @@ final class ChatGPTConnectionTests: XCTestCase {
         XCTAssertFalse(store.errorMessage?.contains("secret") ?? true)
     }
 
+    func testCanCancelSignInBeforeBrowserURLArrives() async throws {
+        let config = configuration("login-start-hangs")
+        let store = ChatGPTAccountStore(configuration: { config }, openURL: { _ in XCTFail("Browser must not open") })
+        store.signIn()
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(store.isWorking)
+        XCTAssertNil(store.pendingLogin)
+        store.cancelSignIn()
+        try await waitForOperation(store)
+        XCTAssertFalse(store.isWorking)
+        XCTAssertFalse(store.isConnected)
+        XCTAssertNil(store.errorMessage)
+    }
+
     func testSignOutStopsInFlightGeneration() async throws {
         let config = configuration("hang")
         let store = ChatGPTAccountStore(configuration: { config }, openURL: { _ in })

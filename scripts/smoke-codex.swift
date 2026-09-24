@@ -5,7 +5,7 @@ import Foundation
 @main
 struct CodexSmoke {
     static func main() async throws {
-        guard CommandLine.arguments.count == 2 else { fatalError("Pass an absolute Codex executable path") }
+        guard CommandLine.arguments.count == 2 else { fatalError("Pass the absolute bundled seminarly-chatgpt executable path") }
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("seminarly-codex-smoke-\(UUID().uuidString)")
         let profile = root.appendingPathComponent("profile")

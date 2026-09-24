@@ -28,6 +28,19 @@ targets:
   Seminarly:
     type: application
     platform: macOS
+    postBuildScripts:
+      - name: Embed ChatGPT connection component
+        script: bash "${SRCROOT}/scripts/embed-chatgpt-runtime.sh"
+        basedOnDependencyAnalysis: false
+        inputFiles:
+          - $(SRCROOT)/scripts/embed-chatgpt-runtime.sh
+          - $(SRCROOT)/scripts/lib/chatgpt-runtime.sh
+          - $(SRCROOT)/scripts/chatgpt-runtime-origin.txt
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Helpers/seminarly-chatgpt
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/LICENSE
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/NOTICE
+          - $(TARGET_BUILD_DIR)/$(CONTENTS_FOLDER_PATH)/Resources/ThirdParty/OpenAICodex/ORIGIN.txt
     sources:
       - Sources
       # Embed the agent skill (SKILL.md) so it ships inside the app bundle at
@@ -44,8 +57,8 @@ targets:
         INFOPLIST_FILE: Sources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Seminarly.entitlements
         PRODUCT_NAME: Seminarly
-        MARKETING_VERSION: "0.1.10"
-        CURRENT_PROJECT_VERSION: "11"
+        MARKETING_VERSION: "0.1.11"
+        CURRENT_PROJECT_VERSION: "12"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: true

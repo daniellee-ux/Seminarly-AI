@@ -12,6 +12,9 @@ struct CodexLaunchConfiguration: Sendable {
 /// One private stdio connection. Generation jobs each own a connection, so cancellation
 /// terminates only that job; stdout events from different meetings cannot interleave.
 actor CodexAppServerClient {
+    // macOS may ask for Keychain access when a user upgrades from the external
+    // CLI Beta. Give them time to respond; cancellation still interrupts promptly.
+    static let authenticationTimeout: Double = 120
     nonisolated let notifications: AsyncThrowingStream<CodexRPCMessage, Error>
     private let notificationWriter: AsyncThrowingStream<CodexRPCMessage, Error>.Continuation
     private var process: Process?
@@ -83,7 +86,7 @@ actor CodexAppServerClient {
         let result = try await request("initialize", params: .object([
             "clientInfo": .object(["name": .string("seminarly"), "title": .string("Seminarly"), "version": .string("0.1.0")]),
             "capabilities": .object(["experimentalApi": .bool(true)])
-        ]))
+        ]), timeout: Self.authenticationTimeout)
         guard let userAgent = result["userAgent"].string,
               let versionText = userAgent.split(separator: " ").first?.split(separator: "/").last,
               let version = SemanticVersion(String(versionText)), version >= SemanticVersion(CodexRuntime.minimumVersion)!

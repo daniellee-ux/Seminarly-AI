@@ -10,7 +10,6 @@ final class ChatGPTAccountStore: ObservableObject {
     @Published private(set) var pendingLogin: ChatGPTLogin?
     @Published private(set) var isWorking = false
     @Published private(set) var errorMessage: String?
-    @Published private(set) var executablePath: String?
 
     private var operation: Task<Void, Never>?
     private var operationID: UUID?
@@ -22,19 +21,12 @@ final class ChatGPTAccountStore: ObservableObject {
 
     init(configuration: (@MainActor () throws -> CodexLaunchConfiguration)? = nil,
          openURL: @escaping @MainActor (URL) -> Void = { NSWorkspace.shared.open($0) }) {
-        self.configuration = configuration ?? {
-            try CodexRuntime.configuration(override: UserDefaults.standard.string(forKey: CodexRuntime.executablePreference))
-        }
+        self.configuration = configuration ?? { try CodexRuntime.configuration() }
         self.openURL = openURL
-        updateExecutablePath()
     }
 
     var isConnected: Bool { account?.type == "chatgpt" }
     var isReady: Bool { isConnected && !isWorking }
-
-    func updateExecutablePath() {
-        executablePath = CodexRuntime.executable(override: UserDefaults.standard.string(forKey: CodexRuntime.executablePreference))?.path
-    }
 
     func refresh() {
         guard !isWorking else { return }
@@ -46,7 +38,8 @@ final class ChatGPTAccountStore: ObservableObject {
         run { store, client, _ in
             let result = try await client.request("account/login/start", params: .object(deviceCode ?
                 ["type": .string("chatgptDeviceCode")] :
-                ["type": .string("chatgpt"), "useHostedLoginSuccessPage": .bool(true), "appBrand": .string("chatgpt")]))
+                ["type": .string("chatgpt"), "useHostedLoginSuccessPage": .bool(true), "appBrand": .string("chatgpt")]),
+                timeout: CodexAppServerClient.authenticationTimeout)
             let login = try result.decode(ChatGPTLogin.self)
             guard let url = login.url else { throw ChatGPTError.invalidLoginURL }
             try Task.checkCancellation()
@@ -130,7 +123,6 @@ final class ChatGPTAccountStore: ObservableObject {
             }
             do {
                 let config = try configuration()
-                updateExecutablePath()
                 try await client.start(config)
                 try await action(self, client, config)
                 try Task.checkCancellation()
@@ -150,7 +142,8 @@ final class ChatGPTAccountStore: ObservableObject {
     }
 
     private func readAccount(_ client: CodexAppServerClient) async throws {
-        let result = try await client.request("account/read", params: .object(["refreshToken": .bool(true)]))
+        let result = try await client.request("account/read", params: .object(["refreshToken": .bool(true)]),
+                                              timeout: CodexAppServerClient.authenticationTimeout)
         let current = try result.decode(ChatGPTAccountResponse.self).account
         try Task.checkCancellation()
         guard current?.type == "chatgpt" else {

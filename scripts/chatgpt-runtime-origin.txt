@@ -1,0 +1,16 @@
+Seminarly's ChatGPT connection component
+
+Upstream: OpenAI Codex App Server 0.156.1
+Source: https://github.com/openai/codex/tree/rust-v0.156.1
+Artifacts: https://github.com/openai/codex/releases/tag/rust-v0.156.1
+License: Apache License 2.0 (see LICENSE and NOTICE alongside this file).
+
+The upstream source is unmodified. Seminarly combines the official macOS
+architecture slices into a universal executable, names it seminarly-chatgpt,
+and applies the app publisher's code signature for macOS distribution.
+The component is a separate process, not a library linked into Seminarly.
+It is not installed onto the user's PATH and is updated only with Seminarly.
+
+OpenAI's hosted services remain subject to the user's account terms, access,
+usage limits, and workspace policies. Open-source licensing of this component
+does not grant additional hosted-service access or imply OpenAI endorsement.
