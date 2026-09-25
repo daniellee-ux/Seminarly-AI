@@ -335,7 +335,7 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     /// Release the engine after the post-stop pipeline has consumed its output
-    /// (or after the recording view died mid-recording and no pipeline will run),
+    /// (or after capture failed to start and no pipeline will run),
     /// then apply any model switch that was requested during the session.
     func endSession() {
         isSessionActive = false

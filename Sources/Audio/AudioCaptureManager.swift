@@ -182,7 +182,11 @@ final class AudioBufferAccumulator: @unchecked Sendable {
 
 @MainActor
 final class AudioCaptureManager: ObservableObject {
-    @Published var state: CaptureState = .idle
+    @Published var state: CaptureState = .idle {
+        didSet { onStateChange?(state) }
+    }
+    /// Session lifecycle handling must run even when no SwiftUI view is mounted.
+    var onStateChange: ((CaptureState) -> Void)?
     @Published var availableProcesses: [AudioProcess] = []
     @Published var selectedProcess: AudioProcess?
     @Published var captureMicrophone = true

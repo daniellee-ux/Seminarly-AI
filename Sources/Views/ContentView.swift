@@ -8,13 +8,6 @@ struct ContentView: View {
     @Query(sort: \Meeting.date, order: .reverse) private var meetings: [Meeting]
     @State private var selectedMeeting: Meeting?
     @State private var showingRecording = false
-    // Bumped every time a *new* recording is started, to re-key RecordingView so
-    // SwiftUI rebuilds it fresh (see presentRecording()).
-    @State private var recordingSessionID = 0
-    // True while THIS window's RecordingView sits in its post-recording (saved)
-    // state. Per-window (not on the shared AppState) so another window's
-    // RecordingView lifecycle can't clobber it.
-    @State private var recordingSaved = false
     @State private var showingSettings = false
     @State private var searchText = ""
     @State private var showDeleteConfirmation = false
@@ -130,7 +123,7 @@ struct ContentView: View {
                     ToolbarItem(placement: .primaryAction) {
                         if appState.isRecording && !viewingRecording {
                             Button {
-                                viewingRecording = true
+                                presentRecording()
                             } label: {
                                 HStack(spacing: Spacing.xxs + 2) {
                                     BreathingDot(isPaused: appState.isPaused)
@@ -159,8 +152,12 @@ struct ContentView: View {
                 }
         }
         .background(SeminarlyColors.background)
-        .onChange(of: appState.isRecording) { _, isRec in
+        .onChange(of: appState.isRecording, initial: true) { _, isRec in
             audioMonitor.isRecordingActive = isRec
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .seminarlyShowRecording)) { _ in
+            showingRecording = true
+            viewingRecording = true
         }
         .onChange(of: columnVisibility) { _, newValue in
             if newValue == .detailOnly {
@@ -208,6 +205,10 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            if appState.recordingSession.shouldRestoreRecording {
+                showingRecording = true
+                viewingRecording = true
+            }
             if LLMSettings.shared.currentDescriptor.kind == .chatGPTPlan { ChatGPTAccountStore.shared.refresh() }
             if case .recoveredByQuarantine = databaseState.error {
                 showRecoveryNoticeAlert = true
@@ -333,9 +334,10 @@ struct ContentView: View {
             if showingRecording {
                 RecordingView(
                     selectedMeeting: $selectedMeeting,
+                    captureManager: appState.recordingSession.captureManager,
+                    session: appState.recordingSession,
                     transcriptionEngine: transcriptionEngine,
                     diarizationEngine: diarizationEngine,
-                    recordingSaved: $recordingSaved,
                     audioMonitor: audioMonitor,
                     preSelectedProcess: preSelectedProcess,
                     isVisible: viewingRecording,
@@ -349,7 +351,7 @@ struct ContentView: View {
                         viewingRecording = false
                     }
                 )
-                .id(recordingSessionID)
+                .id(appState.recordingSession.id)
                 .opacity(viewingRecording ? 1 : 0)
                 .allowsHitTesting(viewingRecording)
             }
@@ -443,21 +445,11 @@ struct ContentView: View {
         }
     }
 
-    /// Brings the recording view forward. If a *finished* recording is still
-    /// mounted — because the user navigated away from the saved screen (tapping
-    /// another session / Settings) without pressing Done, which leaves
-    /// `showingRecording` true — bumping `recordingSessionID` re-keys RecordingView
-    /// so SwiftUI rebuilds it from scratch; otherwise the stale "Recording saved"
-    /// screen would just be re-revealed instead of a new recording.
-    ///
-    /// We re-key *only* in that saved state (this window's `recordingSaved`).
-    /// A setup view (unsaved notes/chip selections), an active capture, and a
-    /// stopped session still finalizing on its background Task (which shares
-    /// transcriptionEngine) are all left mounted and merely re-revealed, never
-    /// torn down mid-flight.
+    /// Every window reconnects to the app-owned session. Only an explicit new
+    /// recording request after saving clears it and rebuilds the setup controls.
     private func presentRecording() {
-        if recordingSaved {
-            recordingSessionID += 1
+        if appState.recordingSession.savedMeeting != nil {
+            appState.recordingSession.prepareNewRecording()
         }
         showingRecording = true
         viewingRecording = true
@@ -486,6 +478,10 @@ struct ContentView: View {
         // Stop any in-flight enhancement so its completion can't write back to
         // the model we're about to delete.
         EnhancementCoordinator.shared.cancel(meeting)
+
+        if appState.recordingSession.savedMeeting == meeting {
+            appState.recordingSession.prepareNewRecording()
+        }
 
         meeting.deleteAudioFiles()
         modelContext.delete(meeting)

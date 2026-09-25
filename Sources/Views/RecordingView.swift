@@ -9,17 +9,12 @@ struct RecordingView: View {
     @Environment(AppState.self) private var appState
     @Binding var selectedMeeting: Meeting?
 
-    @StateObject private var captureManager = AudioCaptureManager()
+    @ObservedObject var captureManager: AudioCaptureManager
+    @Bindable var session: RecordingSession
     @ObservedObject var transcriptionEngine: TranscriptionEngine
     @ObservedObject var diarizationEngine: NeuralDiarizationEngine
 
-    /// True while this view sits in its post-recording (saved) state, i.e.
-    /// `savedMeeting` is set. Owned per-window by ContentView (which re-keys a
-    /// *finished* recording on the next "Record") — a global flag here would let
-    /// one window's teardown clobber another window's saved-screen state.
-    @Binding var recordingSaved: Bool
     @ObservedObject private var enhancement = EnhancementCoordinator.shared
-    @ObservedObject private var templateSettings = TemplateSettings.shared
     @ObservedObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @ObservedObject var audioMonitor: AudioSourceMonitor
 
@@ -35,48 +30,17 @@ struct RecordingView: View {
     /// Called when the user wants to navigate away while keeping recording alive.
     var onNavigateAway: () -> Void = {}
 
-    @State private var isProcessingNotes = false
-    @State private var processingStatus = ""
-    @State private var elapsedTime: TimeInterval = 0
-    @State private var pausedDuration: TimeInterval = 0
-    @State private var pauseStartTime: Date?
-    @State private var timer: Timer?
-    @State private var selectedTemplate: NoteTemplate = TemplateSettings.shared.defaultTemplate
-    @State private var customInstructions: String = TemplateSettings.shared.customInstructions
-    @State private var selectedLanguage: TranscriptionLanguage = TranscriptionSettings.shared.defaultLanguage
-    @State private var selectedSummaryLanguage: SummaryLanguage = SummaryLanguageSettings.shared.defaultLanguage
     @State private var summaryLanguageCustomDraft: String = SummaryLanguageSettings.shared.lastCustomLanguage
     @State private var showSummaryLanguageCustomEditor: Bool = false
     @State private var showRegenerateSheet: Bool = false
 
-    // Notepad state
-    @State private var userNotesText = ""
     @State private var showTranscript = true
-    // Live, append-only log of notes completed during recording. It can drift
-    // from the editable notepad as the user edits/deletes lines, so it is
-    // rebuilt from the final notepad text in stopRecording() before saving.
-    @State private var timestampedNotes: [TimestampedNote] = []
-
-    // Post-recording lifecycle state (set after stopRecording saves the meeting)
-    @State private var savedMeeting: Meeting?
-
-    // True from Record-click until this view's recording session is released
-    // (saved, failed, or torn down). Unlike isRecording/isPaused — which derive
-    // from captureManager.state and are false both before capture actually
-    // starts and after a capture error — this tracks session OWNERSHIP, so
-    // cleanup can't be skipped in those states (which would leak the app-wide
-    // recording flags and the shared engine's session forever).
-    @State private var ownsRecordingSession = false
-    // True once capture actually reached .recording for this attempt — a
-    // start-failure has elapsed-timer ticks but no audio, and must not be
-    // salvaged as an (empty) meeting.
-    @State private var captureDidStart = false
 
     var body: some View {
         VStack(spacing: 0) {
-            if let meeting = savedMeeting {
+            if let meeting = session.savedMeeting {
                 postRecordingView(meeting: meeting)
-            } else if isRecording || isPaused || isProcessingNotes {
+            } else if session.isActive || session.isProcessingNotes {
                 activeRecordingView
             } else {
                 setupView
@@ -85,7 +49,7 @@ struct RecordingView: View {
         .background(SeminarlyColors.background)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .sheet(isPresented: $showRegenerateSheet) {
-            if let meeting = savedMeeting {
+            if let meeting = session.savedMeeting {
                 RegenerateNotesSheet(
                     initialTemplate: initialRegenerateTemplate(for: meeting),
                     initialLanguage: initialRegenerateLanguage(for: meeting),
@@ -101,7 +65,7 @@ struct RecordingView: View {
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
                         Button {
-                            if isRecording || isPaused {
+                            if session.isActive {
                                 onNavigateAway()
                             } else {
                                 onDismiss()
@@ -113,98 +77,17 @@ struct RecordingView: View {
                 }
         }
         .task {
-            // A freshly built view starts in setup (savedMeeting == nil), so it's
-            // not a saved recording until stopRecording() finishes.
-            recordingSaved = false
-            // The engine is shared app-wide: a setup view opening in another
-            // window must not wipe a recording that is live elsewhere or a
-            // stopped one whose finalization is still consuming the engine.
-            if !appState.isRecording && !transcriptionEngine.isSessionActive {
-                transcriptionEngine.reset()
-            }
+            // Reopening a window observes the same session; it must never reset
+            // the engine, notes, or source selection of a background recording.
+            guard session.isInSetupPhase else { return }
             captureManager.refreshProcessList()
             if let preSelectedProcess {
                 captureManager.selectedProcess = preSelectedProcess
             }
         }
-        .onDisappear {
-            // This instance is leaving the hierarchy (dismissed or rebuilt), so
-            // no saved recording is mounted anymore.
-            recordingSaved = false
-            // If the view is torn down while it owns a session whose pipeline
-            // hasn't started (window closed mid-recording, mid-start, or after a
-            // capture error), its captureManager dies with it and no pipeline
-            // would run. Salvage a real recording by stopping capture and running
-            // the normal finalize/save pipeline (its Task outlives this view);
-            // otherwise just clear the app-wide flags and release the engine so
-            // the menu bar and other windows don't report a phantom recording
-            // forever. When the pipeline IS already running (isProcessingNotes),
-            // it survives this view and releases the session itself.
-            if ownsRecordingSession && !isProcessingNotes {
-                // isRecording/isPaused prove capture actually started — salvage
-                // even inside the first second (the elapsed timer only ticks at
-                // 1s, and the user's setup notes are part of the saved session).
-                if isRecording || isPaused {
-                    logger.notice("Window closed mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
-                    stopRecording(viewWillPersist: false)
-                } else {
-                    releaseRecordingSession()
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .seminarlyStopRecordingForTermination)) { _ in
-            // The user quit while this recording is live: stop and save so
-            // termination (held by AppDelegate) can complete with the session
-            // preserved. Mirrors the window-close teardown policy.
-            guard ownsRecordingSession, !isProcessingNotes else { return }
-            if isRecording || isPaused {
-                logger.notice("App terminating mid-recording after \(Int(elapsedTime))s — finalizing and saving the session")
-                stopRecording(viewWillPersist: false)
-            } else {
-                releaseRecordingSession()
-            }
-        }
-        .onChange(of: captureManager.state) { _, newState in
-            if case .recording = newState {
-                captureDidStart = true
-            }
-            // Capture failed to start (or died): isRecording/isPaused turn false
-            // so the Stop button is unreachable, yet the flags set optimistically
-            // in startRecording() would block every retry and model swap forever.
-            // If capture actually reached .recording, real samples were delivered
-            // — salvage them through the normal finalize/save pipeline (the same
-            // capture-started ⇒ salvage policy as window close and app quit),
-            // even inside the first second. Only a start that never produced
-            // audio releases the session so the error banner's Retry can start
-            // over. captureDidStart, not wall-clock: the timer starts before
-            // Core Audio finishes its async setup, so a slow start-failure has
-            // ticks but zero samples.
-            if case .error = newState, ownsRecordingSession, !isProcessingNotes {
-                if captureDidStart {
-                    logger.notice("Capture error after \(Int(elapsedTime))s of recording — finalizing and saving the session")
-                    stopRecording()
-                } else {
-                    releaseRecordingSession()
-                }
-            }
-        }
-        // Sync local chip selection with Settings changes while still in the setup
-        // phase. RecordingView is kept alive behind an opacity layer when the user
-        // navigates to Settings, so the @State initializer only runs once — without
-        // this, changing the default in Settings would not update the chip.
-        .onChange(of: templateSettings.defaultTemplate) { _, newValue in
-            if isInSetupPhase {
-                selectedTemplate = newValue
-            }
-        }
-        .onChange(of: templateSettings.customInstructions) { _, newValue in
-            if isInSetupPhase {
-                customInstructions = newValue
-            }
-        }
-        .onChange(of: summaryLanguageSettings.defaultLanguage) { _, newValue in
-            if isInSetupPhase {
-                selectedSummaryLanguage = newValue
+        .onChange(of: session.savedMeeting?.id, initial: true) { _, _ in
+            if let meeting = session.savedMeeting {
+                selectedMeeting = meeting
             }
         }
         // Auto-select newly-detected audio sources while the user is in the
@@ -226,7 +109,7 @@ struct RecordingView: View {
     /// True when the user hasn't started (or finished) a recording yet — safe to
     /// pull fresh defaults from Settings.
     private var isInSetupPhase: Bool {
-        savedMeeting == nil && !isRecording && !isPaused && !isProcessingNotes
+        session.isInSetupPhase
     }
 
     // MARK: - Phase 1: Setup View (before recording)
@@ -241,7 +124,7 @@ struct RecordingView: View {
 
             Divider()
 
-            if selectedTemplate == .custom {
+            if session.selectedTemplate == .custom {
                 customInstructionsEditor
                 Divider()
             }
@@ -254,7 +137,7 @@ struct RecordingView: View {
             }
 
             NotepadSurface(
-                userNotesText: $userNotesText,
+                userNotesText: $session.userNotesText,
                 structuredNote: nil,
                 placeholderTitle: "Jot down your agenda or questions before the session starts...",
                 placeholderSubtitle: "Use # for headings"
@@ -273,28 +156,28 @@ struct RecordingView: View {
             Divider()
 
             NotepadSurface(
-                userNotesText: $userNotesText,
+                userNotesText: $session.userNotesText,
                 structuredNote: nil,
-                isEditable: !isProcessingNotes,
+                isEditable: !session.isProcessingNotes,
                 autoFocus: true,
                 placeholderTitle: "Type notes as you listen...",
                 placeholderSubtitle: "Use # headings to define sections",
                 onLineCompleted: { lineText in
                     // Append freely — any duplicate of a seeded setup line is
-                    // reconciled when stopRecording() rebuilds from the notepad.
-                    timestampedNotes.append(
-                        TimestampedNote(timestamp: elapsedTime, text: lineText)
+                    // reconciled when session.stopRecording() rebuilds from the notepad.
+                    session.timestampedNotes.append(
+                        TimestampedNote(timestamp: session.elapsedTime, text: lineText)
                     )
                 }
             )
 
-            if isProcessingNotes {
+            if session.isProcessingNotes {
                 Divider()
                 processingSection
                     .padding(Spacing.md)
             }
 
-            if showTranscript && !isProcessingNotes {
+            if showTranscript && !session.isProcessingNotes {
                 Divider()
                 liveTranscriptFooter
             }
@@ -313,7 +196,7 @@ struct RecordingView: View {
             Divider()
 
             NotepadSurface(
-                userNotesText: $userNotesText,
+                userNotesText: $session.userNotesText,
                 structuredNote: meeting.structuredNote,
                 isEditable: meeting.structuredNote == nil,
                 placeholderTitle: "No notes typed during recording",
@@ -337,7 +220,7 @@ struct RecordingView: View {
                 }
             }
         }
-        .onChange(of: userNotesText) { _, newValue in
+        .onChange(of: session.userNotesText) { _, newValue in
             guard meeting.structuredNote == nil else { return }
             let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
             let next = trimmed.isEmpty ? nil : trimmed
@@ -447,7 +330,7 @@ struct RecordingView: View {
             Spacer()
 
             // Transcript toggle
-            if !isProcessingNotes {
+            if !session.isProcessingNotes {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showTranscript.toggle()
@@ -464,7 +347,7 @@ struct RecordingView: View {
             // Pause / Resume
             if isRecording {
                 Button {
-                    pauseRecording()
+                    session.pauseRecording()
                 } label: {
                     Image(systemName: "pause.circle.fill")
                         .font(.system(size: 20))
@@ -474,7 +357,7 @@ struct RecordingView: View {
                 .help("Pause recording")
             } else if isPaused {
                 Button {
-                    resumeRecording()
+                    session.resumeRecording()
                 } label: {
                     Image(systemName: "play.circle.fill")
                         .font(.system(size: 20))
@@ -485,9 +368,9 @@ struct RecordingView: View {
             }
 
             // Stop
-            if isRecording || isPaused {
+            if session.isActive {
                 Button {
-                    stopRecording()
+                    session.stopRecording()
                 } label: {
                     Image(systemName: "stop.circle.fill")
                         .font(.system(size: 20))
@@ -606,24 +489,24 @@ struct RecordingView: View {
         Menu {
             ForEach(NoteTemplate.allCases) { template in
                 Button {
-                    selectedTemplate = template
+                    session.selectedTemplate = template
                 } label: {
                     Label(template.displayName, systemImage: template.icon)
                 }
             }
         } label: {
-            chipLabel(icon: selectedTemplate.icon, text: selectedTemplate.displayName, compact: compact)
+            chipLabel(icon: session.selectedTemplate.icon, text: session.selectedTemplate.displayName, compact: compact)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help("\(selectedTemplate.displayName): \(selectedTemplate.description)")
+        .help("\(session.selectedTemplate.displayName): \(session.selectedTemplate.description)")
     }
 
     private func languageChip(compact: Bool) -> some View {
         Menu {
             ForEach(TranscriptionLanguage.allCases) { lang in
                 Button {
-                    selectedLanguage = lang
+                    session.selectedLanguage = lang
                 } label: {
                     if lang == .auto {
                         Text(lang.displayName)
@@ -633,26 +516,26 @@ struct RecordingView: View {
                 }
             }
         } label: {
-            chipLabel(icon: "globe", text: selectedLanguage.displayName, compact: compact)
+            chipLabel(icon: "globe", text: session.selectedLanguage.displayName, compact: compact)
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
-        .help(selectedLanguage == .auto
+        .help(session.selectedLanguage == .auto
             ? "Language: auto-detect per chunk"
-            : "Language: \(selectedLanguage.displayName)")
+            : "Language: \(session.selectedLanguage.displayName)")
     }
 
     private func summaryLanguageChip(compact: Bool) -> some View {
         Menu {
             Button {
-                selectedSummaryLanguage = .matchTranscript
+                session.selectedSummaryLanguage = .matchTranscript
             } label: {
                 Text(SummaryLanguage.matchTranscript.displayName)
             }
             Divider()
             ForEach(SummaryLanguage.presets, id: \.rawValue) { lang in
                 Button {
-                    selectedSummaryLanguage = lang
+                    session.selectedSummaryLanguage = lang
                 } label: {
                     Text("\(lang.displayName) (\(lang.nativeName))")
                 }
@@ -666,7 +549,7 @@ struct RecordingView: View {
         } label: {
             chipLabel(
                 icon: "text.bubble",
-                text: "Notes: \(selectedSummaryLanguage.displayName)",
+                text: "Notes: \(session.selectedSummaryLanguage.displayName)",
                 compact: compact
             )
         }
@@ -687,7 +570,7 @@ struct RecordingView: View {
                     Button("Use") {
                         let trimmed = summaryLanguageCustomDraft.trimmingCharacters(in: .whitespacesAndNewlines)
                         if !trimmed.isEmpty {
-                            selectedSummaryLanguage = .custom(trimmed)
+                            session.selectedSummaryLanguage = .custom(trimmed)
                             summaryLanguageSettings.lastCustomLanguage = trimmed
                         }
                         showSummaryLanguageCustomEditor = false
@@ -701,13 +584,13 @@ struct RecordingView: View {
     }
 
     private var summaryLanguageHelpText: String {
-        switch selectedSummaryLanguage {
+        switch session.selectedSummaryLanguage {
         case .matchTranscript:
             return "Notes language: same as transcript"
         case .custom(let name):
             return "Notes language: \(name)"
         default:
-            return "Notes language: \(selectedSummaryLanguage.displayName)"
+            return "Notes language: \(session.selectedSummaryLanguage.displayName)"
         }
     }
 
@@ -885,7 +768,7 @@ struct RecordingView: View {
             Image(systemName: "square.and.pencil")
                 .font(.system(size: 11))
                 .foregroundStyle(SeminarlyColors.textSecondary)
-            TextField("Custom note generation instructions...", text: $customInstructions)
+            TextField("Custom note generation instructions...", text: $session.customInstructions)
                 .font(Typography.caption)
                 .textFieldStyle(.plain)
         }
@@ -894,7 +777,7 @@ struct RecordingView: View {
 
     @ViewBuilder
     private var processingSection: some View {
-        if isProcessingNotes {
+        if session.isProcessingNotes {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("Processing")
                     .font(Typography.headline)
@@ -903,7 +786,7 @@ struct RecordingView: View {
                 HStack {
                     ProgressView()
                         .controlSize(.small)
-                    Text(processingStatus)
+                    Text(session.processingStatus)
                         .font(Typography.body)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
@@ -915,263 +798,29 @@ struct RecordingView: View {
 
     // MARK: - Logic
 
-    private var isRecording: Bool {
-        if case .recording = captureManager.state { return true }
-        return false
-    }
+    private var isRecording: Bool { session.isRecording }
 
-    private var isPaused: Bool {
-        if case .paused = captureManager.state { return true }
-        return false
-    }
+    private var isPaused: Bool { session.isPaused }
 
     private var formattedElapsedTime: String {
-        let minutes = Int(elapsedTime) / 60
-        let seconds = Int(elapsedTime) % 60
+        let minutes = Int(session.elapsedTime) / 60
+        let seconds = Int(session.elapsedTime) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
-    /// Undo startRecording()'s optimistic claims after the recording can no
-    /// longer complete (capture error, or view teardown before the pipeline).
-    private func releaseRecordingSession() {
-        // Kill live taps AND any capture start still inside its detached Core
-        // Audio setup — otherwise a torn-down view can leave capture running
-        // headless. Deliberately state-preserving so an .error stays visible.
-        captureManager.abortCapture()
-        timer?.invalidate()
-        timer = nil
-        appState.isRecording = false
-        appState.isPaused = false
-        transcriptionEngine.endSession()
-        ownsRecordingSession = false
-        // If a quit is waiting on this session and no pipeline will run
-        // (nothing worth saving), let termination complete now.
-        AppDelegate.resolveTerminationIfIdle()
-    }
-
     private func startRecording() {
-        guard !appState.isRecording, !transcriptionEngine.isSessionActive else { return }
-        // A failed attempt leaves the capture manager in .error, and its
-        // startRecording() silently no-ops unless .idle — reset it first so
-        // Retry actually retries instead of claiming flags over dead capture.
-        if case .error = captureManager.state {
-            _ = captureManager.stopRecording()
-        }
-        transcriptionEngine.beginSession()
-        ownsRecordingSession = true
-        captureDidStart = false
-
-        // Preserve any notes the user jotted down during the setup phase rather
-        // than wiping them, and seed each non-empty line as a 0:00 entry. This
-        // anchors pre-meeting notes at the start of the timeline: stopRecording()
-        // rebuilds timestampedNotes from the final notepad and keeps each line's
-        // earliest stamp, so a seeded setup line stays at 0:00 even if the user
-        // later presses Enter after it (which would otherwise stamp it mid-session).
-        let setupLines = userNotesText
-            .components(separatedBy: "\n")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
-        timestampedNotes = setupLines.map { TimestampedNote(timestamp: 0, text: $0) }
-
-        // Apply user-selected language
-        transcriptionEngine.selectedLanguage = selectedLanguage.whisperCode
-        if let code = selectedLanguage.whisperCode {
-            transcriptionEngine.detectedLanguage = code
-        }
-
-        captureManager.onAudioSamples = { [weak transcriptionEngine] samples in
-            Task { @MainActor in
-                transcriptionEngine?.appendAudio(samples)
-            }
-        }
-
-        captureManager.startRecording()
-
-        elapsedTime = 0
-        pausedDuration = 0
-        pauseStartTime = nil
-        appState.recordingElapsedTime = 0
-        appState.isPaused = false
-        appState.isRecording = true
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [self] _ in
-            MainActor.assumeIsolated {
-                elapsedTime += 1
-                appState.recordingElapsedTime = elapsedTime
-                // Checkpoint every 5 minutes during long sessions so the WAL stays
-                // small and a forced quit can't lose an entire multi-hour recording.
-                if Int(elapsedTime) > 0 && Int(elapsedTime) % 300 == 0 {
-                    let ok = DatabaseCheckpoint.performCheckpoint(at: AppDelegate.storeURL, mode: .passive)
-                    logger.notice("5-min recording checkpoint fired at elapsed=\(Int(elapsedTime))s success=\(ok, privacy: .public)")
-                }
-            }
-        }
-    }
-
-    private func pauseRecording() {
-        captureManager.pauseRecording()
-        timer?.invalidate()
-        timer = nil
-        pauseStartTime = Date()
-        appState.isPaused = true
-    }
-
-    private func resumeRecording() {
-        if let pauseStart = pauseStartTime {
-            pausedDuration += Date().timeIntervalSince(pauseStart)
-            pauseStartTime = nil
-        }
-        captureManager.resumeRecording()
-        appState.isPaused = false
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [self] _ in
-            MainActor.assumeIsolated {
-                elapsedTime += 1
-                appState.recordingElapsedTime = elapsedTime
-                if Int(elapsedTime) > 0 && Int(elapsedTime) % 300 == 0 {
-                    let ok = DatabaseCheckpoint.performCheckpoint(at: AppDelegate.storeURL, mode: .passive)
-                    logger.notice("5-min recording checkpoint fired at elapsed=\(Int(elapsedTime))s success=\(ok, privacy: .public)")
-                }
-            }
-        }
-    }
-
-    /// Stop capture and run the finalize/diarize/save pipeline. Pass
-    /// `viewWillPersist: false` when this view is being torn down (window
-    /// closed mid-recording): the pipeline Task still completes and saves the
-    /// meeting, but skips the UI-state writes that only make sense for a
-    /// still-mounted view (saved screen, sidebar selection, re-key flag).
-    private func stopRecording(viewWillPersist: Bool = true) {
-        // Accumulate any final paused duration
-        if let pauseStart = pauseStartTime {
-            pausedDuration += Date().timeIntervalSince(pauseStart)
-            pauseStartTime = nil
-        }
-        timer?.invalidate()
-        timer = nil
-        appState.isRecording = false
-        appState.isPaused = false
-
-        let recording = captureManager.stopRecording()
-        let duration = captureManager.recordingDuration - pausedDuration
-
-        logger.info("Recording stopped. Duration: \(String(format: "%.1f", duration))s, systemSamples: \(recording.systemSamples.count), micSamples: \(recording.micSamples?.count ?? 0)")
-
-        isProcessingNotes = true
-
-        // Quitting must wait for this pipeline: the recording exists only in
-        // memory until modelContext.save() below.
-        AppDelegate.beginSavePipeline()
-
-        Task {
-            defer { AppDelegate.endSavePipeline() }
-
-            // 1. Finalize transcription
-            processingStatus = "Finalizing transcription..."
-            let segments = await transcriptionEngine.finalizeTranscription()
-            logger.info("Transcription finalized: \(segments.count) segments")
-            for (i, seg) in segments.prefix(5).enumerated() {
-                logger.info("  Segment[\(i)]: \(String(format: "%.2f", seg.startTime))-\(String(format: "%.2f", seg.endTime))s \"\(String(seg.text.prefix(60)))\"")
-            }
-
-            // 2. Detect language (acoustic analysis, independent of transcription text)
-            if transcriptionEngine.detectedLanguage == nil {
-                let languageDetectionSource = recording.systemSamples.isEmpty
-                    ? recording.combinedSamples
-                    : recording.systemSamples
-                let detectSamples = Array(languageDetectionSource.prefix(Int(16000 * 30)))
-                await transcriptionEngine.detectLanguage(detectSamples)
-            }
-
-            // 3. Diarize
-            processingStatus = "Identifying speakers..."
-            let diarizeResult = await diarizationEngine.diarize(
-                segments: segments,
-                systemSamples: recording.systemSamples,
-                micSamples: recording.micSamples,
-                detectedLanguage: transcriptionEngine.detectedLanguage
-            )
-            let diarizedSegments = diarizeResult.segments
-
-            // Log diarization results
-            let speakers = Set(diarizedSegments.compactMap(\.speaker))
-            logger.info("Diarization complete: \(diarizedSegments.count) segments, speakers: \(speakers.sorted()), embeddings: \(diarizeResult.speakerEmbeddings.count)")
-
-            // 4. Create transcript
-            let transcript = Transcript(
-                rawText: transcriptionEngine.liveText,
-                segments: diarizedSegments
-            )
-            logger.info("Transcript created. rawText length: \(transcript.rawText.count), segments: \(transcript.segments.count)")
-
-            // 5. Rebuild timestampedNotes from the final notepad so it faithfully
-            // mirrors the notes the user actually kept (see TimestampedNote.reconcile).
-            // Enhancement and markdown export prefer it over the raw text, so it
-            // must contain every kept line and nothing stale, even after the user
-            // edits, deletes, or duplicates lines mid-session.
-            let trimmedNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
-            timestampedNotes = TimestampedNote.reconcile(
-                notepadText: userNotesText,
-                log: timestampedNotes,
-                trailingTimestamp: elapsedTime
-            )
-
-            // 6. Save session
-            let sessionTitle = "Session \(DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short))"
-            let meeting = Meeting(
-                title: sessionTitle,
-                date: captureManager.recordingStartTime ?? Date(),
-                duration: duration,
-                appSource: captureManager.selectedProcess?.name,
-                appBundleID: captureManager.selectedProcess?.bundleID
-            )
-            meeting.transcript = transcript
-            transcript.meeting = meeting
-
-            // Save user notes and timestamps
-            meeting.userNotesText = trimmedNotes.isEmpty ? nil : trimmedNotes
-            meeting.timestampedNotes = timestampedNotes.isEmpty ? nil : timestampedNotes
-
-            // Save speaker embeddings for lightweight re-clustering (~500KB vs ~115MB raw audio)
-            meeting.speakerEmbeddings = diarizeResult.speakerEmbeddings
-            meeting.originalSpeakerCount = speakers.count
-            meeting.originalSegmentsData = transcript.segmentsData
-            meeting.detectedLanguage = transcriptionEngine.detectedLanguage
-
-            modelContext.insert(meeting)
-            try? modelContext.save()
-            // End-of-recording checkpoint: the session just wrote its transcript,
-            // segments, and embeddings — make sure those land in the main store file
-            // immediately, so a later crash or forced reboot can't lose them.
-            let ok = DatabaseCheckpoint.performCheckpoint(at: AppDelegate.storeURL, mode: .passive)
-            logger.notice("End-of-recording checkpoint success=\(ok, privacy: .public)")
-
-            if viewWillPersist {
-                // Select the just-saved meeting so the sidebar reflects what's in
-                // the detail pane — without this, the previously-selected meeting
-                // (if any) stays highlighted until the user clicks Done.
-                selectedMeeting = meeting
-
-                isProcessingNotes = false
-                savedMeeting = meeting
-                // Now in the post-recording (saved) state — let ContentView rebuild
-                // this view fresh on the next "Record" instead of re-showing it.
-                recordingSaved = true
-            }
-            // The pipeline has consumed everything it needs from the engine —
-            // release it for the next recording (and for deferred model swaps).
-            transcriptionEngine.endSession()
-            ownsRecordingSession = false
-        }
+        session.startRecording(modelContext: modelContext)
     }
 
     private func initialRegenerateTemplate(for meeting: Meeting) -> NoteTemplate {
-        meeting.structuredNote?.resolvedTemplate ?? selectedTemplate
+        meeting.structuredNote?.resolvedTemplate ?? session.selectedTemplate
     }
 
     private func initialRegenerateLanguage(for meeting: Meeting) -> SummaryLanguage {
         if let note = meeting.structuredNote {
             return SummaryLanguage.fromStorageCode(note.language)
         }
-        return selectedSummaryLanguage
+        return session.selectedSummaryLanguage
     }
 
     private func detectedSummaryLanguage(for meeting: Meeting) -> SummaryLanguage? {
@@ -1182,8 +831,8 @@ struct RecordingView: View {
     }
 
     private func applyEnhancementPreferences(template: NoteTemplate, language: SummaryLanguage, meeting: Meeting) {
-        selectedTemplate = template
-        selectedSummaryLanguage = language
+        session.selectedTemplate = template
+        session.selectedSummaryLanguage = language
         if case .custom(let name) = language {
             summaryLanguageCustomDraft = name
         }
@@ -1196,15 +845,15 @@ struct RecordingView: View {
     /// Runs note enhancement on the saved meeting using the selected preferences
     /// from `RegenerateNotesSheet`.
     private func runEnhancement(template: NoteTemplate, summaryLanguage: SummaryLanguage) {
-        guard let meeting = savedMeeting,
+        guard let meeting = session.savedMeeting,
               let transcript = meeting.transcript,
               !transcript.rawText.isEmpty,
               enhancement.isProviderReady else { return }
 
-        let currentNotes = userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentNotes = session.userNotesText.trimmingCharacters(in: .whitespacesAndNewlines)
         meeting.userNotesText = currentNotes.isEmpty ? nil : currentNotes
 
-        // Persist the raw notes as userNotesText (above), but show the model the
+        // Persist the raw notes as session.userNotesText (above), but show the model the
         // timestamped form when we have it — it carries when each note was taken.
         let notesForPrompt: String?
         let mode: String
@@ -1225,7 +874,7 @@ struct RecordingView: View {
             transcript: transcript.diarizedText,
             userNotes: notesForPrompt,
             template: template,
-            customInstructions: template == .custom ? customInstructions : nil,
+            customInstructions: template == .custom ? session.customInstructions : nil,
             summaryLanguage: summaryLanguage,
             modelContext: modelContext
         )

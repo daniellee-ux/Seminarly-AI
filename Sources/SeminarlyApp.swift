@@ -5,18 +5,22 @@ import os
 
 private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Database")
 
+@MainActor
 @Observable
 final class AppState {
-    var isRecording = false
-    var isPaused = false
-    var recordingElapsedTime: TimeInterval = 0
+    let recordingSession: RecordingSession
+
+    init(recordingSession: RecordingSession = RecordingSession()) {
+        self.recordingSession = recordingSession
+    }
+
+    var isRecording: Bool { recordingSession.isActive }
+    var isPaused: Bool { recordingSession.isPaused }
+    var recordingElapsedTime: TimeInterval { recordingSession.elapsedTime }
 }
 
 extension Notification.Name {
-    /// Posted by AppDelegate when the user quits while a recording is active:
-    /// the live RecordingView stops and saves the session, and termination
-    /// completes once the save pipeline lands.
-    static let seminarlyStopRecordingForTermination = Notification.Name("ai.seminarly.stopRecordingForTermination")
+    static let seminarlyShowRecording = Notification.Name("ai.seminarly.showRecording")
 }
 
 @Observable
@@ -45,9 +49,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor private static var activeSavePipelines = 0
     @MainActor private static var terminationPending = false
+    @MainActor static weak var recordingSession: RecordingSession?
 
     @MainActor static var hasActiveRecordingWork: Bool {
-        activeSavePipelines > 0 || TranscriptionEngine.shared.isSessionActive
+        activeSavePipelines > 0 || recordingSession?.ownsRecordingSession == true
+            || TranscriptionEngine.shared.isSessionActive
     }
 
     /// Bracket a finalize/save pipeline so Cmd+Q / menu-bar Quit waits for the
@@ -66,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor static func resolveTerminationIfIdle() {
         guard terminationPending,
               activeSavePipelines <= 0,
+              recordingSession?.ownsRecordingSession != true,
               !TranscriptionEngine.shared.isSessionActive
         else { return }
         terminationPending = false
@@ -79,30 +86,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Self.terminationPending = true
                 return .terminateLater
             }
-            if TranscriptionEngine.shared.isSessionActive {
+            if Self.recordingSession?.ownsRecordingSession == true {
                 // A recording is live and no pipeline exists yet — quitting now
-                // would discard it. Ask the recording UI to stop and save
-                // (delivered synchronously; stopRecording registers its
-                // pipeline before this returns), then terminate when it lands.
+                // would discard it. Ask the app-owned session to stop and save
+                // and terminate when its save pipeline lands.
                 logger.notice("Delaying termination: active recording session — stopping and saving first")
                 Self.terminationPending = true
-                NotificationCenter.default.post(name: .seminarlyStopRecordingForTermination, object: nil)
-                // Watchdog: if nothing picked the request up (no live recording
-                // view — shouldn't happen, but quit must never hang), give up
-                // waiting and terminate.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
-                    MainActor.assumeIsolated {
-                        if Self.terminationPending, Self.activeSavePipelines <= 0 {
-                            logger.error("Termination watchdog fired — no save pipeline started; quitting anyway")
-                            Self.terminationPending = false
-                            NSApplication.shared.reply(toApplicationShouldTerminate: true)
-                        }
-                    }
+                // Schedule after returning .terminateLater, so even a cancelled
+                // startup cannot reply before AppKit starts waiting for us.
+                Task { @MainActor in
+                    Self.recordingSession?.stopForTermination()
+                    Self.resolveTerminationIfIdle()
                 }
                 return .terminateLater
             }
             return .terminateNow
         }
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -123,6 +126,7 @@ struct SeminarlyApp: App {
     let appState = AppState()
 
     init() {
+        defer { AppDelegate.recordingSession = appState.recordingSession }
         do {
             let migrationResult = try DatabaseStore.migrateLegacyStoreIfNeeded()
             if case .migrated(let meetingCount) = migrationResult {

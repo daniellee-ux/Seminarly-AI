@@ -8,6 +8,13 @@ Seminarly is a native macOS app built with Swift 6 and SwiftUI. It follows a pip
 
 ### Audio (`Sources/Audio/`)
 
+- `RecordingSession`
+  - App-owned `@MainActor` observable session, shared by all windows and the menu bar
+  - Owns capture, elapsed time, user notes, preferences, and the finalize/diarize/save task
+  - Closing or minimizing a window does not stop recording; reopening reconnects to the same session
+  - Holds a `ProcessInfo` user-initiated activity during capture and saving to prevent App Nap and idle system sleep, while allowing the display to sleep; releases it on an explicit pause, startup failure, or completed save
+  - Uses a monotonic clock for duration and a timer in common run-loop modes for display updates
+  - `AppDelegate` stops and saves this session directly on Quit, even with no windows
 - `CoreAudioUtils`
   - Static helpers wrapping `AudioObjectGetPropertyData`
   - `getProcessList()` — queries `kAudioHardwarePropertyProcessObjectList` for all audio-registered processes
