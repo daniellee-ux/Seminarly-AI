@@ -12,6 +12,7 @@
 |------|---------------|
 | `AudioBufferAccumulatorTests.swift` | Thread-safe buffer, format conversion |
 | `AudioFormatConverterTests.swift` | 48kHz/44.1kHz → 16kHz mono conversion |
+| `RecordingSessionTests.swift` | Window-independent capture, close/reopen/minimize, elapsed time, explicit pause, startup/error cleanup, and saving without a view |
 | `ClaudeAPIClientTests.swift` | Keychain save/load/delete |
 | `CodableModelTests.swift` | Codable round-trips for storage models |
 | `DiarizationEngineTests.swift` | MFCC-based speaker assignment |
@@ -116,6 +117,13 @@
 ### Manual Tests
 
 **Audio Capture**
+- [ ] While recording, close the last window (red close button / Cmd+W), wait at least 2 minutes, then reopen from the menu bar or Dock — the same session, notes, timer, and transcript continue
+- [ ] While recording, minimize the window (yellow button / Cmd+M) for at least 2 minutes — audio and transcription continue, and the timer reflects the full elapsed time on return
+- [ ] With no open window, use menu-bar Pause / Resume / Stop — only these explicit controls change capture state, and Stop saves one session
+- [ ] With no open window, Quit the app — wait for transcription and saving to finish, then verify the saved session after relaunch
+- [ ] Pause explicitly, then close/reopen — the session stays paused and its duration excludes paused time
+- [ ] Close the window during capture startup and during finalization — startup continues; finalization still saves exactly once
+- [ ] In Activity Monitor, enable the App Nap column: active recording must remain out of App Nap while hidden; after pause/stop the recording activity assertion is released
 - [ ] Select Zoom from process list → record 30s → audio is clean (no distortion)
 - [ ] Select Google Meet → record → audio captures remote participants
 - [ ] Mic-only mode (no system audio) → captures user voice

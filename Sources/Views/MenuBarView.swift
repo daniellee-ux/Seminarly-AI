@@ -8,13 +8,25 @@ struct MenuBarView: View {
         VStack(spacing: Spacing.xxs) {
             if appState.isRecording {
                 Button {
-                    // Open main window to stop recording
                     NSApplication.shared.activate(ignoringOtherApps: true)
                     openMainWindow()
+                    NotificationCenter.default.post(name: .seminarlyShowRecording, object: nil)
                 } label: {
-                    Label("Recording in progress...", systemImage: "record.circle.fill")
+                    Label(appState.isPaused ? "Recording paused" : "Recording in progress...", systemImage: "record.circle.fill")
                         .foregroundStyle(SeminarlyColors.recording)
                 }
+
+                Button(appState.isPaused ? "Resume Recording" : "Pause Recording") {
+                    if appState.isPaused {
+                        appState.recordingSession.resumeRecording()
+                    } else {
+                        appState.recordingSession.pauseRecording()
+                    }
+                }
+                Button("Stop Recording") {
+                    appState.recordingSession.stopRecording()
+                }
+                Divider()
             }
 
             Button {
@@ -37,6 +49,9 @@ struct MenuBarView: View {
     private func openMainWindow() {
         for window in NSApplication.shared.windows {
             if window.title == "Seminarly" || window.canBecomeMain {
+                if window.isMiniaturized {
+                    window.deminiaturize(nil)
+                }
                 window.makeKeyAndOrderFront(nil)
                 return
             }

@@ -45,6 +45,7 @@
 		4DC885FFE1839F0FC7268D6E /* AnthropicStreamAccumulatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */; };
 		4E747E200CB180C9D52D7681 /* LLMSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7B44FEA6BC39BCDB826FD57 /* LLMSettings.swift */; };
 		4F5E3E3582239412862DCC49 /* CodexProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */; };
+		4FC99892F85190C8A43916F8 /* RecordingSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */; };
 		55625974F4942AE55F1318AB /* ReleaseArchitecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71025614BFFFA23D8CF5F4AF /* ReleaseArchitecture.swift */; };
 		569391AC2571A5DDBA8BEEFF /* NoteTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10363E60B17A3874C19B4B56 /* NoteTemplate.swift */; };
 		588808A26C68718D3CF6A823 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 582B18F272268549F5F54328 /* Assets.xcassets */; };
@@ -106,6 +107,7 @@
 		EAACDE7F9E587D612B126BEF /* LLMProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 442C1A5FDC026A3F72D52856 /* LLMProvider.swift */; };
 		EB318B50A689FE9778820349 /* UpdateChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */; };
 		EBF6C473E13F95D251C6261C /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = 1C52021159AD95599C2F300B /* FluidAudio */; };
+		EC7813615E21C22D6E9A0945 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF02FADB4E83B9F73313F71 /* RecordingSession.swift */; };
 		ECCB4A8391BF8A961103FE9F /* DatabaseErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */; };
 		F0AFACE2FE245FEDA50518DE /* UpdateBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D60962B7A4D96637E48113D /* UpdateBannerView.swift */; };
 		F1B6E3F395BD6AD1A30E5CFC /* MeetingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BD96750494903A36134D6E /* MeetingModel.swift */; };
@@ -226,9 +228,11 @@
 		88213CDD8C472F95C2EF62E4 /* CodexProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexProtocol.swift; sourceTree = "<group>"; };
 		88870F818336A1C4677C1657 /* CoreAudioUtils.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoreAudioUtils.swift; sourceTree = "<group>"; };
 		89274FD20CD968F01BFB40A8 /* CodexAppServerClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexAppServerClient.swift; sourceTree = "<group>"; };
+		8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionTests.swift; sourceTree = "<group>"; };
 		8C186469B8F8014AFC557D7D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		8D26185876B64E5A4D977EC7 /* GetCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GetCommand.swift; sourceTree = "<group>"; };
 		8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MicrophoneCaptureManager.swift; sourceTree = "<group>"; };
+		8FF02FADB4E83B9F73313F71 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 		903EC155361F8700E8718CE6 /* AnthropicStreamAccumulatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnthropicStreamAccumulatorTests.swift; sourceTree = "<group>"; };
 		91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguageAwareDiarizationTests.swift; sourceTree = "<group>"; };
 		9426EFC8C62BB0056C557BB1 /* DatabaseRecoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseRecoveryTests.swift; sourceTree = "<group>"; };
@@ -344,6 +348,7 @@
 				88870F818336A1C4677C1657 /* CoreAudioUtils.swift */,
 				8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */,
 				2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */,
+				8FF02FADB4E83B9F73313F71 /* RecordingSession.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -492,6 +497,7 @@
 				24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */,
 				2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */,
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
+				8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */,
 				3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */,
 				9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */,
 				DC1BF2B7B1FE715610F15DF2 /* SessionFormatterTests.swift */,
@@ -745,6 +751,7 @@
 				5CAB6C3A7C986808A29C93EA /* NoteTemplateTests.swift in Sources */,
 				9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */,
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
+				4FC99892F85190C8A43916F8 /* RecordingSessionTests.swift in Sources */,
 				264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */,
 				09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */,
 				3086DF2F96EE20D942903C43 /* SessionFormatterTests.swift in Sources */,
@@ -825,6 +832,7 @@
 				7508DA39BFFE7BC8286E059E /* OpenAICompatibleProvider.swift in Sources */,
 				26E009AD005BE831D60E27B9 /* ProcessTapManager.swift in Sources */,
 				2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */,
+				EC7813615E21C22D6E9A0945 /* RecordingSession.swift in Sources */,
 				CBD75ED7F232B718B51816A1 /* RecordingView.swift in Sources */,
 				55625974F4942AE55F1318AB /* ReleaseArchitecture.swift in Sources */,
 				430D6B958C0A36A57821B258 /* SemanticVersion.swift in Sources */,
