@@ -8,9 +8,6 @@ struct MeetingDetailView: View {
     @State private var selectedTab = 0
     @State private var isEditing = false
     @State private var editedTitle: String = ""
-    @State private var selectedSpeakerCount: Int = 2
-    @State private var isRediarizing = false
-    @State private var rediarizeStatus = ""
     @State private var editableUserNotes: String = ""
     @State private var showRegenerateSheet = false
 
@@ -229,8 +226,8 @@ struct MeetingDetailView: View {
         ScrollView {
             if let transcript = meeting.transcript {
                 VStack(alignment: .leading, spacing: Spacing.sm) {
-                    if meeting.hasRediarizationData {
-                        speakerControls
+                    if meeting.hasRediarizationData || !transcript.segments.isEmpty {
+                        MeetingSpeakerControls(meeting: meeting)
                     }
 
                     if transcript.segments.isEmpty {
@@ -254,84 +251,6 @@ struct MeetingDetailView: View {
                 )
             }
         }
-        .onAppear {
-            let speakers = Set(meeting.transcript?.segments.compactMap(\.speaker) ?? [])
-            selectedSpeakerCount = max(speakers.count, 2)
-        }
-    }
-
-    private var speakerControls: some View {
-        VStack(alignment: .leading, spacing: Spacing.xs) {
-            HStack(spacing: Spacing.sm) {
-                Text("Speakers")
-                    .font(Typography.headline)
-                    .foregroundStyle(SeminarlyColors.textSecondary)
-
-                Spacer()
-
-                Button(role: .destructive) {
-                    meeting.deleteAudioFiles()
-                    meeting.systemAudioPath = nil
-                    meeting.micAudioPath = nil
-                    meeting.speakerEmbeddingsData = nil
-                    meeting.originalSegmentsData = nil
-                    meeting.originalSpeakerCount = nil
-                    try? modelContext.save()
-                } label: {
-                    Image(systemName: "trash")
-                        .font(Typography.caption)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(SeminarlyColors.textTertiary)
-                .help("Delete rediarization data")
-            }
-
-            HStack(spacing: Spacing.sm) {
-                Picker("", selection: $selectedSpeakerCount) {
-                    ForEach(1...6, id: \.self) { n in
-                        Text("\(n)").tag(n)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 200)
-
-                if selectedSpeakerCount == meeting.originalSpeakerCount,
-                   meeting.originalSegmentsData != nil {
-                    Button {
-                        restoreOriginal()
-                    } label: {
-                        Label("Restore Original", systemImage: "arrow.uturn.backward")
-                            .font(Typography.caption)
-                    }
-                    .disabled(meeting.transcript?.segmentsData == meeting.originalSegmentsData)
-                } else {
-                    Button {
-                        rediarize(numSpeakers: selectedSpeakerCount)
-                    } label: {
-                        if isRediarizing {
-                            HStack(spacing: Spacing.xxs) {
-                                ProgressView()
-                                    .controlSize(.small)
-                                Text(rediarizeStatus)
-                                    .font(Typography.caption)
-                            }
-                        } else {
-                            Label("Rediarize", systemImage: "person.2.wave.2")
-                                .font(Typography.caption)
-                        }
-                    }
-                    .disabled(isRediarizing)
-                }
-            }
-
-            let currentSpeakers = Set(meeting.transcript?.segments.compactMap(\.speaker) ?? [])
-            if !currentSpeakers.isEmpty {
-                Text("Current: \(currentSpeakers.sorted().joined(separator: ", "))")
-                    .font(Typography.caption)
-                    .foregroundStyle(SeminarlyColors.textTertiary)
-            }
-        }
-        .seminarlyCard()
     }
 
     /// Smart enhance: uses enhanceUserNotes() when user has typed notes, otherwise
@@ -370,52 +289,6 @@ struct MeetingDetailView: View {
             summaryLanguage: language,
             modelContext: modelContext
         )
-    }
-
-    private func restoreOriginal() {
-        guard let transcript = meeting.transcript,
-              let originalData = meeting.originalSegmentsData else { return }
-        transcript.segmentsData = originalData
-        try? modelContext.save()
-    }
-
-    private func rediarize(numSpeakers: Int) {
-        guard let transcript = meeting.transcript else { return }
-
-        isRediarizing = true
-
-        if let embeddings = meeting.speakerEmbeddings {
-            rediarizeStatus = "Re-clustering speakers..."
-            Task {
-                let newSegments = NeuralDiarizationEngine.rediarizeFromEmbeddings(
-                    segments: transcript.segments,
-                    speakerEmbeddings: embeddings,
-                    numSpeakers: numSpeakers
-                )
-                transcript.segments = newSegments
-                try? modelContext.save()
-                isRediarizing = false
-                rediarizeStatus = ""
-            }
-        } else if let audio = meeting.loadAudio() {
-            rediarizeStatus = "Re-identifying speakers..."
-            Task {
-                // rediarize() prepares its own forced-speaker-count diarizer;
-                // preparing a throwaway engine here loaded the models twice.
-                let newSegments = await NeuralDiarizationEngine.shared.rediarize(
-                    segments: transcript.segments,
-                    systemSamples: audio.system,
-                    micSamples: audio.mic,
-                    numSpeakers: numSpeakers
-                )
-                transcript.segments = newSegments
-                try? modelContext.save()
-                isRediarizing = false
-                rediarizeStatus = ""
-            }
-        } else {
-            isRediarizing = false
-        }
     }
 
     private var detectedSummaryLanguage: SummaryLanguage? {

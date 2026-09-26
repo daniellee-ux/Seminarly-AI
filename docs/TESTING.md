@@ -17,6 +17,8 @@
 | `CodableModelTests.swift` | Codable round-trips for storage models |
 | `DiarizationEngineTests.swift` | MFCC-based speaker assignment |
 | `LanguageAwareDiarizationTests.swift` | Chinese diarization, PLDA bypass |
+| `SpeakerAttributionTests.swift` | Total speaker budget, confirmed You identity, source-aware assignment, legacy and Codable compatibility |
+| `DiarizationAudioTests.swift` | Shared-microphone and hybrid routing, silent system audio, echo gating, raw-audio count limits and error propagation with injected embeddings |
 | `MFCCExtractorTests.swift` | 34-dimensional feature extraction |
 | `MeetingModelTests.swift` | SwiftData model properties, new fields (userNotesText, timestampedNotes, detectedLanguage) |
 | `NoteStructuringParsingTests.swift` | JSON response parsing, NoteItem source attribution |
@@ -155,6 +157,14 @@
 - [ ] Long meeting (30+ min) → all chunks processed, no memory issues
 
 **Diarization**
+- [ ] An older transcript with Speaker 1, Speaker 2, You → select 2 → at most two labels, including You; select 1 then 2 again → original local-turn evidence remains available
+- [ ] Your voice → choose a speaker → only that identity is renamed You; select Not identified → return to neutral names without changing the count
+- [ ] Change the count so confirmed identities merge → do not label other known speakers You; show a message when the identity cannot be matched confidently
+- [ ] Rediarize remains available when the selected count equals the original count; Restore Original is a separate action
+- [ ] Missing or invalid voice data → visible error and unchanged transcript; no overlapping evidence → unassigned turns, not a guessed Speaker 1
+- [ ] Shared-microphone recording → multiple neutral speakers; no automatic You; re-clustering includes microphone embeddings
+- [ ] Hybrid meeting and loudspeaker echo → verify source selection against listening, especially overlapping speech; energy gating is not full echo cancellation
+- [ ] During rediarization, switch sessions or tabs → cancel publication of the old result and do not overwrite another session or a concurrent edit
 - [ ] 2-speaker meeting → labels alternate correctly at speaker changes
 - [ ] Single speaker → all segments labeled "Speaker 1"
 - [ ] Rapid back-and-forth → some mislabeling acceptable

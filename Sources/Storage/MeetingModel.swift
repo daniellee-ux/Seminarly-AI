@@ -76,6 +76,31 @@ final class Meeting {
         speakerEmbeddingsData != nil || systemAudioPath != nil
     }
 
+    /// Start each adjustment from the same evidence, including legacy You turns
+    /// that a temporary one-speaker result would otherwise erase. User-confirmed
+    /// identity annotations survive separately from the current display names.
+    var rediarizationSegments: [TranscriptSegment] {
+        let current = transcript?.segments ?? []
+        guard let data = originalSegmentsData,
+              let original = try? JSONDecoder().decode([TranscriptSegment].self, from: data),
+              original.count == current.count,
+              zip(original, current).allSatisfy({
+                  $0.startTime == $1.startTime && $0.endTime == $1.endTime && $0.text == $1.text
+              }) else { return current }
+        return zip(original, current).map { baseline, latest in
+            var segment = baseline
+            segment.isUser = latest.isUser
+            segment.audioSource = latest.audioSource ?? baseline.audioSource
+            return segment
+        }
+    }
+
+    var hasLegacySpeakerEvidence: Bool {
+        guard let embeddings = speakerEmbeddings, !embeddings.isEmpty else { return false }
+        return embeddings.allSatisfy { $0.source == nil }
+            && rediarizationSegments.contains { $0.speaker == "You" }
+    }
+
     var formattedDuration: String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
@@ -188,6 +213,11 @@ struct TranscriptSegment: Codable, Hashable, Sendable {
     let text: String
     var speaker: String?
     var speakerConfidence: Double?
+    // Optional Codable fields keep existing transcript blobs readable without
+    // changing the SwiftData schema. Source, identity, and name are independent.
+    var speakerID: String?
+    var audioSource: SpeakerAudioSource?
+    var isUser: Bool?
 }
 
 struct TimestampedNote: Codable, Hashable, Sendable {
