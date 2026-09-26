@@ -1,5 +1,6 @@
 import Foundation
 @preconcurrency import WhisperKit
+import QwenASR
 import os.log
 
 private let logger = Logger(subsystem: "ai.seminarly.Seminarly", category: "Transcription")
@@ -41,8 +42,7 @@ final class TranscriptionEngine: ObservableObject {
         return false
     }
 
-    /// When set (e.g. "en", "zh"), forces WhisperKit to transcribe in this language.
-    /// When nil, WhisperKit auto-detects per chunk.
+    /// ISO language code (e.g. "en", "zh"), or nil for per-chunk detection.
     var selectedLanguage: String?
 
     /// True from the moment a recording claims the engine until its post-stop
@@ -56,7 +56,18 @@ final class TranscriptionEngine: ObservableObject {
     /// Name of the currently loaded model variant; nil while unloaded/loading.
     private(set) var loadedModelName: String?
 
-    private var whisperKit: WhisperKit?
+    private enum Backend {
+        case whisper(WhisperKit)
+        case qwen(QwenASRRuntime)
+    }
+    private var backend: Backend?
+    private var whisperKit: WhisperKit? {
+        if case .whisper(let kit) = backend { return kit }
+        return nil
+    }
+    var usesQwen: Bool { loadedModelName == QwenModelStore.modelID }
+    private var processedSamples = 0
+    private var transcriptionGeneration = 0
     private var accumulatedAudio: [Float] = []
     private var transcriptionTask: Task<Void, Never>?
     private var hasDetectedLanguage = false
@@ -175,7 +186,7 @@ final class TranscriptionEngine: ObservableObject {
         // Re-check: a recording may have claimed the engine between loadModel's
         // guard and this task's first turn on the MainActor — never tear the
         // model out from under it. Queue the swap for endSession() instead.
-        if isSessionActive && whisperKit != nil {
+        if isSessionActive && backend != nil {
             pendingModelName = name
             return
         }
@@ -186,12 +197,17 @@ final class TranscriptionEngine: ObservableObject {
         // until the replacement has loaded — a failed switch must not strand
         // the user with no model at all. Cost: both models are transiently
         // resident during a (rare, user-initiated) switch.
-        let previousKit = whisperKit
+        let previousBackend = backend
         let previousName = loadedModelName
         isModelLoaded = false
         loadedModelName = nil
 
         do {
+            if name == QwenModelStore.modelID {
+                try await loadQwen(name: name, generation: generation)
+                await releasePreviousQwen(previousBackend)
+                return
+            }
             // Offline-first: a fully installed model loads straight from disk with
             // zero network. WhisperKit.download always hits huggingface.co before
             // touching the cache, so an unreachable network (offline, blocked, or a
@@ -205,6 +221,7 @@ final class TranscriptionEngine: ObservableObject {
                     try await loadWhisperKit(from: localFolder, name: name, generation: generation)
                     let elapsed = String(format: "%.1f", Date().timeIntervalSince(startedAt))
                     logger.notice("Loaded \(name, privacy: .public) from local cache in \(elapsed, privacy: .public)s")
+                    await releasePreviousQwen(previousBackend)
                     return
                 } catch is CancellationError {
                     throw CancellationError()
@@ -245,17 +262,18 @@ final class TranscriptionEngine: ObservableObject {
             try await loadWhisperKit(from: modelFolder, name: name, generation: generation)
             let elapsed = String(format: "%.1f", Date().timeIntervalSince(startedAt))
             logger.notice("Loaded \(name, privacy: .public) after download in \(elapsed, privacy: .public)s")
+            await releasePreviousQwen(previousBackend)
         } catch {
             clearModelLoadStatus(generation: generation)
-            // The old model is still alive (previousKit) — put it back so a
+            // The old model is still alive (previousBackend) — put it back so a
             // failed switch keeps working instead of stranding the user with
             // no model at all. Also roll back the persisted selection when it
             // still names the failed model: otherwise the next launch retries
             // the uninstalled model and blocks recording despite a working
             // installed one. (Skipped when a newer request already changed the
             // setting again — the guard below only matches this load's name.)
-            if let previousKit {
-                whisperKit = previousKit
+            if let previousBackend {
+                backend = previousBackend
                 loadedModelName = previousName
                 isModelLoaded = true
             }
@@ -269,14 +287,22 @@ final class TranscriptionEngine: ObservableObject {
                 logger.notice("Load of \(name, privacy: .public) cancelled")
                 return
             }
-            if let previousName, previousKit != nil,
-               TranscriptionSettings.shared.whisperModel == name
+            if let previousName, previousBackend != nil,
+               TranscriptionSettings.shared.model == name
             {
-                TranscriptionSettings.shared.whisperModel = previousName
+                TranscriptionSettings.shared.model = previousName
             }
             logger.error("Failed to load model \(name, privacy: .public): \(error.localizedDescription, privacy: .public)")
             failure = .modelLoad("Failed to load model: \(error.localizedDescription)")
         }
+    }
+
+    private func releasePreviousQwen(_ previous: Backend?) async {
+        guard case .qwen(let runtime) = previous else { return }
+        if case .qwen(let current) = backend, current === runtime { return }
+        // Release model arrays before clearing the MLX allocator cache, so a
+        // switch back to Whisper does not retain the old Qwen GPU allocation.
+        await runtime.unload()
     }
 
     private func loadWhisperKit(from folder: URL, name: String, generation: Int) async throws {
@@ -292,7 +318,33 @@ final class TranscriptionEngine: ObservableObject {
         guard generation == loadGeneration, loadingModelName == name else {
             throw CancellationError()
         }
-        whisperKit = candidate
+        backend = .whisper(candidate)
+        loadedModelName = name
+        isModelLoaded = true
+        clearModelLoadStatus(generation: generation)
+    }
+
+    private func loadQwen(name: String, generation: Int) async throws {
+        guard QwenModelStore.isSupported else { throw QwenModelStore.StoreError.unsupportedHardware }
+        loadingProgress = "Preparing Qwen transcription model..."
+        isDownloading = true
+        let directory = try await QwenModelStore.prepare { [weak self] fraction in
+            Task { @MainActor [weak self] in
+                guard let self, self.loadGeneration == generation,
+                      self.loadingModelName == name, self.isDownloading else { return }
+                self.downloadFraction = max(self.downloadFraction, fraction)
+                self.loadingProgress = "Preparing Qwen transcription model... \(Int(self.downloadFraction * 100))%"
+            }
+        }
+        try Task.checkCancellation()
+        guard generation == loadGeneration else { throw CancellationError() }
+        isDownloading = false
+        loadingProgress = "Loading Qwen transcription model..."
+        let candidate = QwenASRRuntime()
+        try await candidate.load(from: directory)
+        try Task.checkCancellation()
+        guard generation == loadGeneration, loadingModelName == name else { throw CancellationError() }
+        backend = .qwen(candidate)
         loadedModelName = name
         isModelLoaded = true
         clearModelLoadStatus(generation: generation)
@@ -331,7 +383,7 @@ final class TranscriptionEngine: ObservableObject {
             return
         }
         failure = nil
-        await loadModel(name: TranscriptionSettings.shared.whisperModel)
+        await loadModel(name: TranscriptionSettings.shared.model)
     }
 
     /// Release the engine after the post-stop pipeline has consumed its output
@@ -355,7 +407,7 @@ final class TranscriptionEngine: ObservableObject {
         // of intent so an old endSession task can never supersede that selection.
         guard !Task.isCancelled,
               desiredModelName == name,
-              TranscriptionSettings.shared.whisperModel == name
+              TranscriptionSettings.shared.model == name
         else {
             logger.notice("Discarded stale deferred model load for \(name, privacy: .public)")
             return
@@ -438,8 +490,10 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     func processAccumulatedAudio() {
-        guard !isTranscribing, !accumulatedAudio.isEmpty else { return }
-
+        guard isModelLoaded, !isTranscribing, !accumulatedAudio.isEmpty else { return }
+        // Reserve synchronously: several audio callbacks may arrive before the
+        // new Task enters transcribe().
+        isTranscribing = true
         let audioToProcess = accumulatedAudio
         accumulatedAudio = []
 
@@ -462,34 +516,67 @@ final class TranscriptionEngine: ObservableObject {
     }
 
     private func transcribe(_ audio: [Float]) async {
-        guard let whisperKit else { return }
-
+        // A reset can cancel a queued task before it gets its first actor turn.
+        // Do not let that old task advance the new session's audio clock.
+        guard !Task.isCancelled else { return }
+        guard let backend else { isTranscribing = false; return }
+        let generation = transcriptionGeneration
+        let timeOffset = Double(processedSamples) / sampleRate
+        // Advance over all consumed audio, including silence and failed chunks.
+        // The previous segment's end is not the next audio chunk's start.
+        processedSamples += audio.count
         isTranscribing = true
-        defer { isTranscribing = false }
+        defer { if generation == transcriptionGeneration { isTranscribing = false } }
 
         do {
-            // Calculate offset ONCE per chunk — WhisperKit segment timestamps
-            // are relative to the start of the audio array passed in.
-            let timeOffset = totalTranscribedDuration()
-            let options = DecodingOptions(language: selectedLanguage, wordTimestamps: true)
-            let results = try await whisperKit.transcribe(audioArray: audio, decodeOptions: options)
-            for result in results {
-                for segment in result.segments {
-                    let cleanedText = Self.stripWhisperTokens(segment.text)
-                    let newSegment = TranscriptSegment(
-                        startTime: timeOffset + Double(segment.start),
-                        endTime: timeOffset + Double(segment.end),
-                        text: cleanedText
-                    )
-                    if !newSegment.text.isEmpty {
-                        segments.append(newSegment)
-                        liveText += newSegment.text + " "
+            switch backend {
+            case .whisper(let kit):
+                let options = DecodingOptions(language: selectedLanguage, wordTimestamps: true)
+                let results = try await kit.transcribe(audioArray: audio, decodeOptions: options)
+                try Task.checkCancellation()
+                guard generation == transcriptionGeneration else { return }
+                for result in results {
+                    for segment in result.segments {
+                        appendSegment(start: timeOffset + Double(segment.start),
+                                      end: timeOffset + Double(segment.end), text: segment.text)
+                    }
+                }
+            case .qwen(let runtime):
+                let language = selectedLanguage.flatMap(TranscriptionLanguage.init(rawValue:))
+                if language == .no {
+                    throw NSError(domain: "QwenASR", code: 1, userInfo: [
+                        NSLocalizedDescriptionKey: "Norwegian requires a Whisper model."
+                    ])
+                }
+                for range in QwenAudioChunks.ranges(in: audio) {
+                    try Task.checkCancellation()
+                    guard generation == transcriptionGeneration else { return }
+                    let samples = audio[range]
+                    guard QwenAudioChunks.hasSignal(samples) else { continue }
+                    let result = try await runtime.transcribe(samples: Array(samples), language: language?.qwenName)
+                    try Task.checkCancellation()
+                    guard generation == transcriptionGeneration else { return }
+                    appendSegment(start: timeOffset + Double(range.lowerBound) / sampleRate,
+                                  end: timeOffset + Double(range.upperBound) / sampleRate, text: result.text)
+                    if detectedLanguage == nil,
+                       let detected = TranscriptionLanguage.codeFromQwen(result.language) {
+                        detectedLanguage = detected
                     }
                 }
             }
+        } catch is CancellationError {
+            // Session reset/superseded work must not publish stale text or errors.
         } catch {
+            guard generation == transcriptionGeneration else { return }
             failure = .transcription("Transcription error: \(error.localizedDescription)")
         }
+    }
+
+    private func appendSegment(start: Double, end: Double, text: String) {
+        let cleaned = Self.stripWhisperTokens(text)
+        guard !cleaned.isEmpty else { return }
+        segments.append(TranscriptSegment(startTime: start, endTime: end, text: cleaned))
+        liveText += cleaned + " "
     }
 
     /// Remove WhisperKit special tokens like <|startoftranscript|>, <|en|>, <|0.00|>, etc.
@@ -514,11 +601,9 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    private func totalTranscribedDuration() -> Double {
-        segments.last?.endTime ?? 0
-    }
-
     func reset() {
+        transcriptionGeneration &+= 1
+        processedSamples = 0
         transcriptionTask?.cancel()
         transcriptionTask = nil
         accumulatedAudio = []

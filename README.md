@@ -30,7 +30,9 @@ Build and run in Xcode (⌘R).
 
 ### 2. First launch
 
-On first launch, Seminarly downloads the Whisper large-v3 model (~3GB from Hugging Face). This is a one-time download — transcription runs locally after that.
+On first launch, Seminarly prepares the selected Whisper model. Models are cached on your Mac and transcription runs locally after download.
+
+Apple Silicon users can try **Settings → Transcription Model → Qwen 0.6B**, an experimental mixed-quantization model with a ~542 MB download. Whisper remains the default. See [Qwen setup, timing limitations, and validation](docs/qwen-asr.md).
 
 Grant permissions when prompted:
 - **Microphone** — to capture your voice
@@ -108,7 +110,7 @@ After the session, your notes appear in the detail view. You can edit them and c
 ## Features
 
 - **System audio capture** — tap any app's audio (Zoom, Meet, Teams) via Core Audio Taps API
-- **On-device transcription** — WhisperKit (Whisper large-v3) runs locally, no cloud fees
+- **On-device transcription** — WhisperKit, plus an optional Qwen 0.6B experiment on Apple Silicon; no cloud transcription fees
 - **Speaker diarization** — FluidAudio neural embeddings with Chinese-aware k-means re-clustering
 - **Live notepad** — jot notes during recording; AI expands them with transcript context
 - **AI-structured notes** — summaries, action items, decisions with per-item source attribution

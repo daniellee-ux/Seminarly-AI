@@ -61,6 +61,32 @@ enum TranscriptionLanguage: String, Codable, CaseIterable, Identifiable, Sendabl
         }
     }
 
+    /// Qwen takes full language names. Norwegian is not in its supported set.
+    var qwenName: String? {
+        switch self {
+        case .auto, .no: nil
+        case .zh: "Chinese"
+        case .yue: "Cantonese"
+        default: displayName
+        }
+    }
+
+    static func fromQwen(_ name: String?) -> Self? {
+        guard let name else { return nil }
+        return allCases.first { $0.qwenName?.lowercased() == name.lowercased() }
+    }
+
+    /// Auto-detection can return languages beyond the app's manual picker.
+    static func codeFromQwen(_ name: String?) -> String? {
+        if let language = fromQwen(name) { return language.rawValue }
+        guard let name else { return nil }
+        return [
+            "indonesian": "id", "malay": "ms", "finnish": "fi", "czech": "cs",
+            "filipino": "tl", "persian": "fa", "greek": "el", "romanian": "ro",
+            "hungarian": "hu", "macedonian": "mk",
+        ][name.lowercased()]
+    }
+
     var nativeName: String {
         switch self {
         case .auto: return "Auto"

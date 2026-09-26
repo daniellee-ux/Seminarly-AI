@@ -504,7 +504,7 @@ struct RecordingView: View {
 
     private func languageChip(compact: Bool) -> some View {
         Menu {
-            ForEach(TranscriptionLanguage.allCases) { lang in
+            ForEach(TranscriptionLanguage.allCases.filter { !transcriptionEngine.usesQwen || $0 != .no }) { lang in
                 Button {
                     session.selectedLanguage = lang
                 } label: {
@@ -658,6 +658,9 @@ struct RecordingView: View {
         }
         if let err = diarizationEngine.errorMessage { return (false, err) }
         if !transcriptionEngine.isModelLoaded { return (false, "Loading transcription model...") }
+        if transcriptionEngine.usesQwen && session.selectedLanguage == .no {
+            return (false, "Norwegian requires Whisper. Choose another language or model.")
+        }
         if !diarizationEngine.isModelReady { return (false, "Loading speaker diarization models...") }
         if captureManager.selectedProcess == nil && !captureManager.captureMicrophone {
             return (false, "Select an audio source or enable microphone")

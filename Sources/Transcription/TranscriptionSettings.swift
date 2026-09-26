@@ -14,15 +14,20 @@ final class TranscriptionSettings: ObservableObject {
         }
     }
 
-    @Published var whisperModel: String {
+    @Published var model: String {
         didSet {
-            UserDefaults.standard.set(whisperModel, forKey: whisperModelKey)
+            UserDefaults.standard.set(model, forKey: whisperModelKey)
         }
     }
 
     private init() {
         let savedRaw = UserDefaults.standard.string(forKey: defaultLanguageKey) ?? TranscriptionLanguage.auto.rawValue
         self.defaultLanguage = TranscriptionLanguage(rawValue: savedRaw) ?? .auto
-        self.whisperModel = UserDefaults.standard.string(forKey: whisperModelKey) ?? Self.defaultModel
+        let savedModel = UserDefaults.standard.string(forKey: whisperModelKey) ?? Self.defaultModel
+        self.model = savedModel == QwenModelStore.modelID && !QwenModelStore.isSupported
+            ? Self.defaultModel : savedModel
+        if self.model == QwenModelStore.modelID && self.defaultLanguage == .no {
+            self.defaultLanguage = .auto
+        }
     }
 }

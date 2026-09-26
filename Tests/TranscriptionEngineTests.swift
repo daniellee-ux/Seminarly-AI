@@ -73,19 +73,19 @@ final class TranscriptionEngineStateTests: XCTestCase {
     @MainActor
     func testDeferredSwitchIsDiscardedAfterPersistedSelectionChanges() async {
         let settings = TranscriptionSettings.shared
-        let originalModel = settings.whisperModel
-        defer { settings.whisperModel = originalModel }
+        let originalModel = settings.model
+        defer { settings.model = originalModel }
 
         let engine = TranscriptionEngine()
         engine.isModelLoaded = true
         engine.beginSession()
 
         let deferredModel = "test-deferred-model"
-        settings.whisperModel = deferredModel
+        settings.model = deferredModel
         await engine.loadModel(name: deferredModel)
 
         engine.endSession()
-        settings.whisperModel = "test-newer-model"
+        settings.model = "test-newer-model"
 
         // endSession dispatches the deferred request in a new task. Keeping all
         // mutations before this yield makes the ordering deterministic.
