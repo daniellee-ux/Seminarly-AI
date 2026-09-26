@@ -97,3 +97,23 @@ Sources: [Swift fixtures](https://github.com/Blaizzy/mlx-audio-swift/tree/01dec7
 Validation: 501 XCTest cases passed with both opt-in Mandarin checks enabled.
 Apple Silicon and Intel debug builds succeeded; Intel execution was not tested
 on physical Intel hardware. The Qwen option is disabled in Intel builds.
+
+## Local test app
+
+Run `./scripts/package-qwen-test.sh` on Apple Silicon to create a release-optimized,
+ad-hoc-signed **Seminarly Qwen Test.app** and DMG under `build/qwen-test.*/`.
+This is a local test package, not a notarized public release. The local ad-hoc
+configuration disables hardened runtime because it has no signing Team ID for
+framework validation; the production Release configuration retains it.
+
+The `QwenTest` configuration has its own bundle ID (`ai.seminarly.Seminarly.QwenTest`),
+preferences, database, backups and recordings in
+`~/Library/Application Support/Seminarly Qwen Test/`. It does not import the legacy
+production database or install production updates. Its embedded CLI uses that same
+test database. Qwen is selected by default; Whisper is still selectable in Settings.
+Downloaded model weights and existing AI account credentials/runtime are shared
+with the regular app, so models do not need to be downloaded twice.
+
+The optimized `QwenTest` configuration passed 502 tests on 2026-09-26, including
+profile isolation, real Mandarin inference and the engine silence/timeline test.
+The 4.20-second Mandarin fixture decoded in 0.24 seconds in this local run.

@@ -122,8 +122,7 @@ final class Meeting {
     }
 
     static var audioDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("Seminarly/Audio", isDirectory: true)
+        DatabaseStore.appSupportDirectory.appendingPathComponent("Audio", isDirectory: true)
     }
 
     func saveAudio(systemSamples: [Float], micSamples: [Float]?) {

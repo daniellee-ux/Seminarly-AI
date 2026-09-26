@@ -3,7 +3,11 @@ import Foundation
 @MainActor
 final class TranscriptionSettings: ObservableObject {
     static let shared = TranscriptionSettings()
+    #if SEMINARLY_TEST_BUILD && arch(arm64)
+    static let defaultModel = QwenModelStore.modelID
+    #else
     static let defaultModel = "openai_whisper-large-v3-v20240930_turbo"
+    #endif
 
     private let defaultLanguageKey = "defaultTranscriptionLanguage"
     private let whisperModelKey = "whisperModel"

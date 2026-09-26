@@ -10,7 +10,11 @@ enum DatabaseStore {
 
     static var appSupportDirectory: URL {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        #if SEMINARLY_TEST_BUILD
+        return appSupport.appendingPathComponent("Seminarly Qwen Test", isDirectory: true)
+        #else
         return appSupport.appendingPathComponent("Seminarly", isDirectory: true)
+        #endif
     }
 
     static var storeURL: URL {
@@ -18,8 +22,13 @@ enum DatabaseStore {
     }
 
     static var legacyStoreURL: URL {
+        #if SEMINARLY_TEST_BUILD
+        // Test builds must never import the production legacy database.
+        return appSupportDirectory.appendingPathComponent("legacy.store")
+        #else
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         return appSupport.appendingPathComponent("default.store")
+        #endif
     }
 
     static var backupDirectory: URL {

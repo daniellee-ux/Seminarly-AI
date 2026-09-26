@@ -14,6 +14,13 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
     }
 
     func checkForUpdates() {
+        #if SEMINARLY_TEST_BUILD
+        let alert = NSAlert()
+        alert.messageText = "Seminarly Qwen Test"
+        alert.informativeText = "This test app is updated by installing a new test build. It does not install production releases."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        #else
         do {
             if controller == nil {
                 let value = SPUStandardUpdaterController(startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
@@ -33,6 +40,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
             alert.addButton(withTitle: "Cancel")
             if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(UpdateChecker.releasesPageURL) }
         }
+        #endif
     }
 
     func feedURLString(for updater: SPUUpdater) -> String? { Self.feedURL().absoluteString }

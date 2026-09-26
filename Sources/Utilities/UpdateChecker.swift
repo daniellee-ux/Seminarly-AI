@@ -108,6 +108,10 @@ final class UpdateChecker: ObservableObject {
     // MARK: - Public entry points
 
     func checkForUpdates(mode: UpdateCheckMode) {
+        #if SEMINARLY_TEST_BUILD
+        if mode == .manual { AppUpdater.shared.checkForUpdates() }
+        return
+        #else
         if mode == .manual {
             AppUpdater.shared.checkForUpdates()
             return
@@ -127,6 +131,7 @@ final class UpdateChecker: ObservableObject {
             UpdateSettings.shared.markCheckedNow()
         }
         Task { await performCheck() }
+        #endif
     }
 
     func dismissBanner() {
