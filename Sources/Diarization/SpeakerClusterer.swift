@@ -189,14 +189,14 @@ final class SpeakerClusterer: @unchecked Sendable {
     // MARK: - K-Means Cosine Clustering
 
     /// Cluster embeddings into `k` groups using K-means with cosine similarity.
-    /// Uses K-means++ initialization and L2-normalized centroids.
+    /// Uses deterministic farthest-first initialization and L2-normalized centroids.
     static func kMeansCosine(embeddings: [[Float]], k: Int, maxIterations: Int = 20) -> [Int] {
         let n = embeddings.count
         guard n > 0, k > 0 else { return [] }
         if k >= n { return Array(0..<n) }
         if k == 1 { return [Int](repeating: 0, count: n) }
 
-        // K-means++ initialization
+        // Stable seeds keep repeated rediarization of the same evidence consistent.
         var centroids = [l2Normalize(embeddings[0])]
 
         for _ in 1..<k {
@@ -212,14 +212,9 @@ final class SpeakerClusterer: @unchecked Sendable {
                 centroids.append(l2Normalize(embeddings[centroids.count]))
                 continue
             }
-            var threshold = Float.random(in: 0..<totalDist)
             var chosen = 0
-            for i in 0..<n {
-                threshold -= distances[i]
-                if threshold <= 0 {
-                    chosen = i
-                    break
-                }
+            for i in 1..<n where distances[i] > distances[chosen] {
+                chosen = i
             }
             centroids.append(l2Normalize(embeddings[chosen]))
         }

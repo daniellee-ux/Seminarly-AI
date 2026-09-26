@@ -43,7 +43,7 @@ final class LanguageAwareDiarizationTests: XCTestCase {
 
     // MARK: - Embedding Re-clustering for Chinese
 
-    func testReclusterFromEmbeddingsProducesTwoSpeakers() {
+    func testReclusterFromEmbeddingsProducesTwoSpeakers() throws {
         // Create two distinct embedding clusters (256D vectors)
         let clusterA = [Float](repeating: 1.0, count: 128) + [Float](repeating: 0.0, count: 128)
         let clusterB = [Float](repeating: 0.0, count: 128) + [Float](repeating: 1.0, count: 128)
@@ -62,7 +62,7 @@ final class LanguageAwareDiarizationTests: XCTestCase {
             TranscriptSegment(startTime: 15, endTime: 20, text: "Still second speaker"),
         ]
 
-        let result = NeuralDiarizationEngine.rediarizeFromEmbeddings(
+        let result = try NeuralDiarizationEngine.rediarizeFromEmbeddings(
             segments: segments,
             speakerEmbeddings: embeddings,
             numSpeakers: 2
@@ -77,7 +77,7 @@ final class LanguageAwareDiarizationTests: XCTestCase {
         XCTAssertNotEqual(result[0].speaker, result[2].speaker)
     }
 
-    func testReclusterPreservesYouLabels() {
+    func testReclusterPreservesYouLabels() throws {
         let clusterA = [Float](repeating: 1.0, count: 128) + [Float](repeating: 0.0, count: 128)
         let clusterB = [Float](repeating: 0.0, count: 128) + [Float](repeating: 1.0, count: 128)
 
@@ -91,12 +91,65 @@ final class LanguageAwareDiarizationTests: XCTestCase {
             TranscriptSegment(startTime: 5, endTime: 10, text: "Other person"),
         ]
 
-        let result = NeuralDiarizationEngine.rediarizeFromEmbeddings(
+        let result = try NeuralDiarizationEngine.rediarizeFromEmbeddings(
             segments: segments,
             speakerEmbeddings: embeddings,
             numSpeakers: 2
         )
 
         XCTAssertEqual(result[0].speaker, "You", "You labels should be preserved after re-clustering")
+    }
+
+    // MARK: - Requested Total Speaker Count (Legacy Recordings)
+
+    func testRequestedTwoSpeakersIncludesPreservedYou() throws {
+        let fixture = makeMixedSourceFixture()
+        let result = try NeuralDiarizationEngine.rediarizeFromEmbeddings(
+            segments: fixture.segments,
+            speakerEmbeddings: fixture.embeddings,
+            numSpeakers: 2
+        )
+
+        XCTAssertEqual(result.first?.speaker, "You")
+        XCTAssertEqual(result.map(\.text), fixture.segments.map(\.text))
+        let speakers = Set(result.compactMap(\.speaker))
+
+        XCTAssertEqual(speakers.count, 2, "Requested 2 total speakers; got \(speakers.sorted())")
+    }
+
+    func testRequestedOneSpeakerDoesNotAddYouOnTop() throws {
+        let fixture = makeMixedSourceFixture()
+        let result = try NeuralDiarizationEngine.rediarizeFromEmbeddings(
+            segments: fixture.segments,
+            speakerEmbeddings: fixture.embeddings,
+            numSpeakers: 1
+        )
+
+        XCTAssertEqual(result.map(\.text), fixture.segments.map(\.text))
+        let speakers = Set(result.compactMap(\.speaker))
+
+        XCTAssertEqual(speakers.count, 1, "Requested 1 total speaker; got \(speakers.sorted())")
+    }
+
+    private func makeMixedSourceFixture() -> (segments: [TranscriptSegment], embeddings: [SpeakerEmbedding]) {
+        let clusterA = [Float](repeating: 1.0, count: 128) + [Float](repeating: 0.0, count: 128)
+        let clusterB = [Float](repeating: 0.0, count: 128) + [Float](repeating: 1.0, count: 128)
+
+        // Embeddings come from system audio only; the mic-only turn has none.
+        // Both remote clusters retain transcript turns after You is preserved.
+        let embeddings = [
+            SpeakerEmbedding(speakerId: "s0", embedding: clusterA, startTime: 5, endTime: 10, qualityScore: 0.9),
+            SpeakerEmbedding(speakerId: "s0", embedding: clusterA, startTime: 10, endTime: 15, qualityScore: 0.9),
+            SpeakerEmbedding(speakerId: "s1", embedding: clusterB, startTime: 15, endTime: 20, qualityScore: 0.9),
+            SpeakerEmbedding(speakerId: "s1", embedding: clusterB, startTime: 20, endTime: 25, qualityScore: 0.9),
+        ]
+        let segments = [
+            TranscriptSegment(startTime: 0, endTime: 5, text: "Local microphone turn", speaker: "You", speakerConfidence: 0.9),
+            TranscriptSegment(startTime: 5, endTime: 10, text: "Remote turn A"),
+            TranscriptSegment(startTime: 10, endTime: 15, text: "Remote turn A continued"),
+            TranscriptSegment(startTime: 15, endTime: 20, text: "Remote turn B"),
+            TranscriptSegment(startTime: 20, endTime: 25, text: "Remote turn B continued"),
+        ]
+        return (segments, embeddings)
     }
 }

@@ -84,13 +84,15 @@ Two engines are available: the neural engine (primary) and the MFCC-based engine
   - `prepareModels()` — downloads and caches neural diarization models (one-time, async)
   - `diarize(segments:systemSamples:micSamples:sampleRate:)` — main entry point
   - **Speaker assignment algorithm**:
-    - Runs `diarizer.process(audio:)` on mixed system+mic audio
+    - Runs `diarizer.process(audio:)` separately for each active source, including microphone-only meetings
     - FluidAudio returns `[TimedSpeakerSegment]` with `speakerId`, `startTimeSeconds`, `endTimeSeconds`, `qualityScore`
-    - Maps neural segments onto transcript segments using **time-overlap weighting** (most overlapping speaker wins)
-    - Builds consistent `speakerId` → "Speaker N" label mapping
+    - Persists source-tagged embeddings and matches transcript turns using source evidence and **time-overlap weighting**
+    - `SpeakerAttribution` assigns identities separately from display names; unmatched turns remain unassigned
     - Confidence = overlap fraction of the dominant speaker
-  - **Mic speaker detection**: if mic samples provided, segments where mic RMS energy > 2x system energy are relabeled as "You"
-  - Performance: ~15 seconds for a full meeting (vs ~5 minutes with old approach)
+  - **Source evidence**: `DiarizationAudio` uses source energy to prefer the clean system track over microphone echo, including silent-system and microphone-only cases. A microphone can contain multiple people and never automatically implies "You".
+  - **Rediarization**: deterministic cosine clustering applies one total speaker budget across sources. Legacy system-only data reserves a place for existing You turns; new recordings use explicit user confirmation to name one clustered identity You.
+  - **Identity controls**: `MeetingSpeakerControls` exposes total speakers, an independent Restore Original action, and Your voice selection. Per-turn confirmation survives count changes without creating an extra speaker.
+  - Processing two active sources requires two neural passes; performance and speech accuracy depend on the recording. Source-energy gating is a heuristic, not acoustic echo cancellation.
   - Supports N speakers (not limited to 2)
 
 - `DiarizationEngine` (legacy fallback)
@@ -170,8 +172,9 @@ Two engines are available: the neural engine (primary) and the MFCC-based engine
   - Computed: `diarizedText` — formats segments as `[HH:MM] Speaker: text`
   - Inverse: `meeting: Meeting?`
 - `TranscriptSegment` (Codable, Sendable struct)
-  - Properties: startTime, endTime, text, speaker (optional), speakerConfidence (optional)
+  - Properties: startTime, endTime, text, speaker (optional), speakerConfidence (optional), speakerID (optional), audioSource (optional), isUser (optional explicit identity annotation)
   - Stored as JSON array inside `Transcript.segmentsData`
+  - Optional metadata decodes from existing records without changing the SwiftData schema
 - `StructuredNote` (`@Model`)
   - Properties: `summary`, `templateType: String` (e.g. "lecture"), `sectionsData: Data` (JSON-encoded), `generatedAt`
   - Computed: `sections` — decode/encode `[NoteSection]` from `sectionsData`
