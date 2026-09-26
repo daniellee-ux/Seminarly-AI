@@ -33,6 +33,22 @@ final class AppUpdaterTests: XCTestCase {
         XCTAssertEqual(info["SUSendProfileInfo"] as? Bool, false)
     }
 
+    func testSparkleRecognizesTransportAndLifecycleDelegateHooks() {
+        // Optional Objective-C delegate methods can silently stop being called
+        // if a Swift-imported selector is misspelled.
+        let updater = AppUpdater()
+        for selector in [
+            "updater:didFindValidUpdate:",
+            "updater:willDownloadUpdate:withRequest:",
+            "updater:didFinishUpdateCycleForUpdateCheck:error:",
+            "updater:userDidMakeChoice:forUpdate:state:",
+            "updaterDidNotFindUpdate:",
+            "updaterShouldRelaunchApplication:",
+        ] {
+            XCTAssertTrue(updater.responds(to: NSSelectorFromString(selector)), selector)
+        }
+    }
+
     func testSavePipelineBlocksUpdaterRestart() {
         AppDelegate.beginSavePipeline()
         XCTAssertTrue(AppDelegate.hasActiveRecordingWork)

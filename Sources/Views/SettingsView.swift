@@ -14,6 +14,7 @@ struct SettingsView: View {
     @StateObject private var transcriptionSettings = TranscriptionSettings.shared
     @StateObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @StateObject private var updateSettings = UpdateSettings.shared
+    @StateObject private var automaticUpdates = AppUpdater.shared.automatic
     @AppStorage("autoDetectAudioSources") private var autoDetectEnabled = true
 
     /// Selection-only proxy: holds either a preset case, `.matchTranscript`, or
@@ -297,7 +298,7 @@ struct SettingsView: View {
                 Section("Software Updates") {
                     HStack {
                         Button {
-                            UpdateChecker.shared.checkForUpdates(mode: .manual)
+                            AppUpdater.shared.checkForUpdates()
                         } label: {
                             Text("Check Now")
                                 .font(Typography.captionMedium)
@@ -311,9 +312,25 @@ struct SettingsView: View {
                         Spacer()
                     }
 
-                    Toggle("Automatically check for updates", isOn: $updateSettings.automaticallyCheckForUpdates)
+                    Toggle("Automatically check for and download updates", isOn: $updateSettings.automaticallyCheckForUpdates)
 
-                    Text("When enabled, Seminarly checks GitHub at most once a day and shows a dismissible banner. Updates are downloaded and installed only when you choose, using smaller difference downloads when available. No meeting content or system profile is sent; GitHub receives normal network request information such as your IP address.")
+                    if let version = automaticUpdates.status.version {
+                        HStack {
+                            if automaticUpdates.status == .downloading(version) {
+                                ProgressView().controlSize(.small)
+                                Text("Downloading version \(version)…")
+                            } else {
+                                Text(automaticUpdates.status == .ready(version)
+                                    ? "Version \(version) is downloaded and ready to install."
+                                    : "Version \(version) is available.")
+                                Spacer()
+                                Button("Install Update…") { AppUpdater.shared.checkForUpdates() }
+                            }
+                        }
+                        .font(Typography.caption)
+                    }
+
+                    Text("When enabled, Seminarly checks GitHub at most once a day, including while the window is closed, and downloads available updates in the background. Choose Install Update to review and confirm installation and restart. Recording and saving must finish before restarting. No meeting content or system profile is sent; GitHub receives normal network request information such as your IP address.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

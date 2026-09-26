@@ -28,7 +28,7 @@ struct ContentView: View {
     @ObservedObject private var transcriptionEngine = TranscriptionEngine.shared
     @ObservedObject private var diarizationEngine = NeuralDiarizationEngine.shared
     @StateObject private var audioMonitor = AudioSourceMonitor()
-    @StateObject private var updateChecker = UpdateChecker.shared
+    @StateObject private var automaticUpdates = AppUpdater.shared.automatic
 
     private var filteredMeetings: [Meeting] {
         if searchText.isEmpty { return meetings }
@@ -105,11 +105,14 @@ struct ContentView: View {
                             .transition(.move(edge: .top).combined(with: .opacity))
                         }
 
-                        if !viewingRecording, let release = updateChecker.availableUpdate {
+                        if !viewingRecording, !automaticUpdates.bannerDismissed,
+                           let version = automaticUpdates.status.version {
                             UpdateBannerView(
-                                versionTitle: UpdateChecker.displayName(for: release),
-                                onDownload: { updateChecker.openDownload() },
-                                onDismiss: { updateChecker.dismissBanner() }
+                                versionTitle: version,
+                                isDownloading: automaticUpdates.status == .downloading(version),
+                                isDownloaded: automaticUpdates.status == .ready(version),
+                                onInstall: { AppUpdater.shared.checkForUpdates() },
+                                onDismiss: { automaticUpdates.dismissBanner() }
                             )
                             .transition(.move(edge: .top).combined(with: .opacity))
                         }
@@ -118,7 +121,7 @@ struct ContentView: View {
                     .padding(.horizontal, Spacing.xl)
                 }
                 .animation(.easeInOut(duration: 0.3), value: audioMonitor.detectedProcess != nil)
-                .animation(.easeInOut(duration: 0.3), value: updateChecker.availableUpdate != nil)
+                .animation(.easeInOut(duration: 0.3), value: automaticUpdates.status)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         if appState.isRecording && !viewingRecording {
@@ -223,13 +226,6 @@ struct ContentView: View {
             async let diarization: Void = diarizationEngine.prepareModels()
             _ = await (transcription, diarization)
             audioMonitor.startMonitoring()
-        }
-        .task {
-            // Opt-in, default-off, throttled to once a day. A found update appears
-            // as the banner above; up-to-date / errors stay silent on this path.
-            if UpdateSettings.shared.isDueForAutomaticCheck() {
-                updateChecker.checkForUpdates(mode: .automatic)
-            }
         }
     }
 
