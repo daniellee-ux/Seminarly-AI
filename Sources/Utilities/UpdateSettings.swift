@@ -1,12 +1,7 @@
 import Foundation
 
-/// Persisted preferences for update checks, mirroring the other UserDefaults-backed
-/// `*Settings` singletons (e.g. `TranscriptionSettings`).
-///
-/// Automatic checks are **opt-in and default-off**. Seminarly is local-first — your
-/// audio never leaves your Mac — and an update check is an outbound request to
-/// GitHub, so it never happens at launch unless the user enables it here. Manual
-/// checks (the menu item / Settings button) are a separate, explicitly-clicked path.
+/// Background checks and downloads remain opt-in. Installation always starts
+/// from an explicit user action, independently of this preference.
 @MainActor
 final class UpdateSettings: ObservableObject {
     static let shared = UpdateSettings()
@@ -15,27 +10,30 @@ final class UpdateSettings: ObservableObject {
     /// pure `isDue(...)` helper can use it as a default argument off the main actor.
     nonisolated static let automaticCheckInterval: TimeInterval = 24 * 60 * 60
 
+    private let defaults: UserDefaults
+
     private let automaticallyCheckKey = "automaticallyCheckForUpdates"
     private let lastCheckKey = "lastUpdateCheckTimestamp"
 
     @Published var automaticallyCheckForUpdates: Bool {
         didSet {
-            UserDefaults.standard.set(automaticallyCheckForUpdates, forKey: automaticallyCheckKey)
+            defaults.set(automaticallyCheckForUpdates, forKey: automaticallyCheckKey)
         }
     }
 
-    private init() {
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         // Absent key → `bool(forKey:)` returns false, which is the intended default.
-        self.automaticallyCheckForUpdates = UserDefaults.standard.bool(forKey: automaticallyCheckKey)
+        self.automaticallyCheckForUpdates = defaults.bool(forKey: automaticallyCheckKey)
     }
 
     var lastCheckDate: Date? {
-        let timestamp = UserDefaults.standard.double(forKey: lastCheckKey)
+        let timestamp = defaults.double(forKey: lastCheckKey)
         return timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
 
     func markCheckedNow(date: Date = Date()) {
-        UserDefaults.standard.set(date.timeIntervalSince1970, forKey: lastCheckKey)
+        defaults.set(date.timeIntervalSince1970, forKey: lastCheckKey)
     }
 
     /// True when the opt-in is on *and* enough time has elapsed since the last check.

@@ -10,6 +10,8 @@
 
 | File | What It Covers |
 |------|---------------|
+| `AutomaticUpdateTests.swift` | Opt-in scheduling, cancellation, persistent cache, corrupt download recovery, loopback delivery, and real Sparkle probes of signed/tampered feeds |
+| `AppUpdaterTests.swift` | Signed updater defaults, CPU feeds, Sparkle delegate hooks, and recording-save restart protection |
 | `AudioBufferAccumulatorTests.swift` | Thread-safe buffer, format conversion |
 | `AudioFormatConverterTests.swift` | 48kHz/44.1kHz → 16kHz mono conversion |
 | `RecordingSessionTests.swift` | Window-independent capture, close/reopen/minimize, elapsed time, explicit pause, startup/error cleanup, and saving without a view |
@@ -117,6 +119,15 @@
 - [ ] Structured note summary relates to transcript content
 
 ### Manual Tests
+
+**Software Updates**
+- [ ] In a disposable app copy, enable Settings → Software Updates → Automatically check for and download updates. Close every window and verify a due background download completes; reopening the app or Settings shows the downloaded version.
+- [ ] Disable the setting during a download. The download stops and no late completion brings back the banner. Manual Check Now still works.
+- [ ] Quit after background download without choosing Install Update. The installed version remains unchanged; the next launch can reuse the downloaded archive.
+- [ ] Choose Install Update, review the native Sparkle prompt, and confirm installation. With two signed test releases, verify the replacement and relaunch, including a compatible delta and full-download fallback.
+- [ ] While recording, paused, or saving, attempt an update restart. The app declines to restart until recording work is finished; the meeting remains saved.
+- [ ] Skip a release in Sparkle. Its cached reminder should not return on the next launch. A manual check can still revisit the skipped release.
+- [ ] With a corrupted cache, verify signature validation prevents installation and a later manual attempt downloads normally instead of reusing the failed file.
 
 **Audio Capture**
 - [ ] While recording, close the last window (red close button / Cmd+W), wait at least 2 minutes, then reopen from the menu bar or Dock — the same session, notes, timer, and transcript continue

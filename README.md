@@ -116,6 +116,7 @@ After the session, your notes appear in the detail view. You can edit them and c
 - **Summary language picker** — generate notes in any of 24 preset languages (or any custom language) independent of the spoken transcript; covers Simplified vs Traditional Chinese, Cantonese, Bokmål vs Nynorsk, Brazilian vs European Portuguese
 - **Auto-detect audio sources** — detects meeting apps and prompts to record
 - **6 note templates** — freeform, meeting, lecture, study guide, podcast, custom
+- **Background updates** — opt in under Settings → Software Updates to check daily and download updates; review and confirm installation when you are ready to restart
 - **Local storage** — all data stays on your Mac (SwiftData)
 - **Menu bar app** — start/stop recording from anywhere
 - **Export** — Markdown file or clipboard copy

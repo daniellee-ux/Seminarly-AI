@@ -44,100 +44,19 @@ struct GitHubReleaseAsset: Decodable, Equatable, Sendable {
     let name: String
 }
 
-/// Why a check was started — controls how loudly results are reported.
-enum UpdateCheckMode {
-    /// User clicked "Check for Updates…" — report *every* outcome (including
-    /// up-to-date and errors) via an `NSAlert`.
-    case manual
-    /// Opt-in once-a-day launch check — surface only an available update, as a
-    /// quiet in-window banner; stay silent on up-to-date / errors.
-    case automatic
-}
-
 /// The result of comparing the running build against the latest release.
 enum UpdateOutcome: Equatable {
     case updateAvailable(release: GitHubRelease, latest: SemanticVersion)
     case upToDate(current: SemanticVersion)
 }
 
-enum UpdateCheckError: LocalizedError {
-    case network(String)
-    case http(Int)
-    case decoding
-
-    var errorDescription: String? {
-        switch self {
-        case .network(let message): return message
-        case .http(let code): return "GitHub returned an unexpected response (HTTP \(code))."
-        case .decoding: return "The response from GitHub couldn't be read."
-        }
-    }
-}
-
-/// Quiet opt-in update awareness. User-initiated checks and installation are
-/// handled by Sparkle, including signed delta updates and full-download fallback.
-@MainActor
-final class UpdateChecker: ObservableObject {
-    static let shared = UpdateChecker()
-
-    /// Set when an automatic check finds a newer release; drives the in-window
-    /// `UpdateBannerView`. Manual checks present an `NSAlert` and leave this nil.
-    @Published private(set) var availableUpdate: GitHubRelease?
-
-    /// Mode of the in-flight check, or nil when idle. Tracked (rather than a plain
-    /// bool) so a manual request arriving mid-check can promote the running check
-    /// to `.manual` instead of being silently dropped.
-    private var activeMode: UpdateCheckMode?
-
-    nonisolated private static let releasesURL = URL(
-        string: "https://api.github.com/repos/daniellee-ux/Seminarly-AI/releases/latest"
-    )!
-
+/// Pure helpers for GitHub release metadata and release-note rendering.
+/// Runtime update checks use Sparkle's signed appcast through AppUpdater.
+enum UpdateChecker {
     /// Safe fallback when a release has no compatible installer attached.
     nonisolated static let releasesPageURL = URL(
         string: "https://github.com/daniellee-ux/Seminarly-AI/releases/latest"
     )!
-
-    private init() {}
-
-    /// The running build's marketing version (`CFBundleShortVersionString`).
-    nonisolated static var currentVersionString: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0"
-    }
-
-    // MARK: - Public entry points
-
-    func checkForUpdates(mode: UpdateCheckMode) {
-        if mode == .manual {
-            AppUpdater.shared.checkForUpdates()
-            return
-        }
-        if activeMode != nil {
-            // A check is already running — don't fire a second network request, but
-            // honor an explicit manual request by upgrading how the in-flight check
-            // reports (quiet banner → alert, and surface up-to-date / errors). Keeps
-            // a clicked "Check for Updates…" from looking like a no-op at launch.
-            if mode == .manual { activeMode = .manual }
-            return
-        }
-        activeMode = mode
-        // Stamp the time up front so repeated launches don't re-hit GitHub even if
-        // the network is slow or failing.
-        if mode == .automatic {
-            UpdateSettings.shared.markCheckedNow()
-        }
-        Task { await performCheck() }
-    }
-
-    func dismissBanner() {
-        availableUpdate = nil
-    }
-
-    /// Download the release that was displayed, preferring this Mac's native
-    /// installer. Older releases can still provide the universal Seminarly.dmg.
-    func openDownload(release: GitHubRelease? = nil) {
-        AppUpdater.shared.checkForUpdates()
-    }
 
     // MARK: - Pure logic (nonisolated → unit-testable off the main actor)
 
@@ -306,130 +225,4 @@ final class UpdateChecker: ObservableObject {
         return "Version \(tag)"
     }
 
-    // MARK: - Networking
-
-    /// Fetch the latest release. `nonisolated` and `URLSession`-injectable so it
-    /// stays off the main actor; the GitHub API requires a `User-Agent` header.
-    nonisolated static func fetchLatestRelease(session: URLSession = .shared) async throws -> GitHubRelease {
-        var request = URLRequest(url: releasesURL)
-        request.timeoutInterval = 15
-        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        request.setValue("Seminarly/\(currentVersionString)", forHTTPHeaderField: "User-Agent")
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw UpdateCheckError.network(error.localizedDescription)
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw UpdateCheckError.network("No response from GitHub.")
-        }
-        guard http.statusCode == 200 else {
-            throw UpdateCheckError.http(http.statusCode)
-        }
-        do {
-            return try JSONDecoder().decode(GitHubRelease.self, from: data)
-        } catch {
-            throw UpdateCheckError.decoding
-        }
-    }
-
-    // MARK: - Orchestration
-
-    private func performCheck() async {
-        defer { activeMode = nil }
-        do {
-            let release = try await Self.fetchLatestRelease()
-            // Read the effective mode *after* the round-trip so a manual request that
-            // promoted the check while it was in flight is honored.
-            let isManual = activeMode == .manual
-            switch Self.evaluate(currentVersion: Self.currentVersionString, release: release) {
-            case .updateAvailable(let release, let latest):
-                logger.notice("Update available: \(latest.description, privacy: .public)")
-                if isManual {
-                    presentUpdateAlert(release: release, latest: latest)
-                } else {
-                    availableUpdate = release
-                }
-            case .upToDate(let current):
-                logger.info("Up to date at \(current.description, privacy: .public)")
-                if isManual { presentUpToDateAlert(current: current) }
-            }
-        } catch {
-            logger.error("Update check failed: \(error.localizedDescription, privacy: .public)")
-            if activeMode == .manual { presentErrorAlert(error: error) }
-        }
-    }
-
-    // MARK: - Alerts (manual checks only)
-
-    private func presentUpdateAlert(release: GitHubRelease, latest: SemanticVersion) {
-        let alert = NSAlert()
-        alert.messageText = "Update Available"
-        var info = "\(Self.displayName(for: release)) is available — you're on \(Self.currentVersionString)."
-        // Render the notes into a scrollable accessory so nothing is trimmed and the
-        // markdown shows formatted rather than as raw syntax.
-        if let notes = Self.renderedReleaseNotes(release.body) {
-            info += "\n\nWhat's new:"
-            alert.accessoryView = makeNotesAccessory(notes)
-        }
-        alert.informativeText = info
-        alert.addButton(withTitle: "Download")
-        alert.addButton(withTitle: "Later")
-        if alert.runModal() == .alertFirstButtonReturn {
-            openDownload(release: release)
-        }
-    }
-
-    /// A bordered, scrollable, read-only text view for the alert's release notes.
-    /// Sized to content up to a cap, then scrolls — so long notes are never trimmed.
-    private func makeNotesAccessory(_ notes: NSAttributedString) -> NSScrollView {
-        let width: CGFloat = 360
-        let textHeight = notes.boundingRect(
-            with: NSSize(width: width - 20, height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]
-        ).height
-        let height = min(170, max(54, ceil(textHeight) + 18))
-
-        let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        scrollView.hasVerticalScroller = true
-        scrollView.autohidesScrollers = true
-        scrollView.borderType = .bezelBorder
-        scrollView.drawsBackground = false
-
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: width, height: height))
-        textView.isEditable = false
-        textView.isSelectable = true
-        textView.drawsBackground = false
-        textView.textContainerInset = NSSize(width: 6, height: 8)
-        textView.isVerticallyResizable = true
-        textView.isHorizontallyResizable = false
-        textView.autoresizingMask = [.width]
-        textView.textContainer?.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
-        textView.textContainer?.widthTracksTextView = true
-        textView.textStorage?.setAttributedString(notes)
-
-        scrollView.documentView = textView
-        return scrollView
-    }
-
-    private func presentUpToDateAlert(current: SemanticVersion) {
-        let alert = NSAlert()
-        alert.messageText = "You're up to date"
-        alert.informativeText = "Seminarly \(current.description) is the latest version."
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
-
-    private func presentErrorAlert(error: Error) {
-        let alert = NSAlert()
-        alert.messageText = "Couldn't Check for Updates"
-        alert.informativeText = error.localizedDescription
-        alert.addButton(withTitle: "OK")
-        alert.runModal()
-    }
 }
