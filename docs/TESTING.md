@@ -3,7 +3,7 @@
 ## Overview
 
 - Test target: `SeminarlyTests` (XCTest)
-- 136 unit tests across 13 test files in `Tests/`
+- Unit and opt-in integration tests live in `Tests/`; fixture-dependent checks report explicit skips
 - CI runs on GitHub Actions on every push/PR
 
 ## Test Files
@@ -12,8 +12,12 @@
 |------|---------------|
 | `AutomaticUpdateTests.swift` | Opt-in scheduling, cancellation, persistent cache, corrupt download recovery, loopback delivery, and real Sparkle probes of signed/tampered feeds |
 | `AppUpdaterTests.swift` | Signed updater defaults, CPU feeds, Sparkle delegate hooks, and recording-save restart protection |
+| `LocalModelDiscoveryTests.swift` | Known cache roots, snapshot priority, symlinks, malformed refs, split Whisper model/tokenizer caches, and read-only tokenizer staging |
+| `QwenModelDiscoveryTests.swift` | Hash validation, reuse without downloads/copies, partial snapshots, dangling-link repair, cancellation and invalid downloads |
+| `ModelDiscoveryInferenceTests.swift` | Opt-in real Qwen and Whisper inference from external cache layouts; see `docs/qwen-asr.md` for fixture variables |
 | `AudioBufferAccumulatorTests.swift` | Thread-safe buffer, format conversion |
 | `AudioFormatConverterTests.swift` | 48kHz/44.1kHz → 16kHz mono conversion |
+| `MeetingAudioCompatibilityTests.swift` | Legacy retained-audio references, path safety and old-store compatibility |
 | `RecordingSessionTests.swift` | Window-independent capture, close/reopen/minimize, elapsed time, explicit pause, startup/error cleanup, and saving without a view |
 | `ClaudeAPIClientTests.swift` | Keychain save/load/delete |
 | `CodableModelTests.swift` | Codable round-trips for storage models |

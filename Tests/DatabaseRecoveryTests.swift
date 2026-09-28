@@ -120,6 +120,19 @@ final class DatabaseRecoveryTests: XCTestCase {
 
     // MARK: - DatabaseStore
 
+    func testBuildKeepsRecordingsAndDatabaseInTheSameProfile() {
+        #if SEMINARLY_TEST_BUILD
+        XCTAssertEqual(DatabaseStore.appSupportDirectory.lastPathComponent, "Seminarly Qwen Test")
+        XCTAssertEqual(DatabaseStore.legacyStoreURL.deletingLastPathComponent(), DatabaseStore.appSupportDirectory)
+        XCTAssertEqual(Bundle.main.bundleIdentifier, "ai.seminarly.Seminarly.QwenTest")
+        #else
+        XCTAssertEqual(DatabaseStore.appSupportDirectory.lastPathComponent, "Seminarly")
+        #endif
+        XCTAssertEqual(Meeting.audioDirectory.deletingLastPathComponent(), DatabaseStore.appSupportDirectory)
+        XCTAssertEqual(DatabaseStore.storeURL.deletingLastPathComponent(), DatabaseStore.appSupportDirectory)
+        XCTAssertEqual(DatabaseStore.backupDirectory.deletingLastPathComponent(), DatabaseStore.appSupportDirectory)
+    }
+
     func testLegacyStoreMigratesIntoAppOwnedStore() throws {
         let legacyStore = tempDir.appendingPathComponent("default.store")
         let targetStore = tempDir

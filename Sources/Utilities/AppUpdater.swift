@@ -37,15 +37,26 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
     }
 
     private func checkForUpdateInformation() throws -> Bool {
+        #if SEMINARLY_TEST_BUILD
+        return false
+        #else
         let updater = try updaterController().updater
         guard manualStartTask == nil, !informationCheckInProgress,
               !updater.sessionInProgress, updater.canCheckForUpdates else { return false }
         informationCheckInProgress = true
         updater.checkForUpdateInformation()
         return true
+        #endif
     }
 
     func checkForUpdates() {
+        #if SEMINARLY_TEST_BUILD
+        let alert = NSAlert()
+        alert.messageText = "Seminarly Qwen Test"
+        alert.informativeText = "This test app is updated by installing a new test build. It does not install production releases."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+        #else
         automatic.prepareForManualUpdate()
         if informationCheckInProgress {
             // A click during a background probe must still open the manual UI.
@@ -84,6 +95,7 @@ final class AppUpdater: NSObject, SPUUpdaterDelegate {
                 if alert.runModal() == .alertFirstButtonReturn { NSWorkspace.shared.open(UpdateChecker.releasesPageURL) }
             }
         }
+        #endif
     }
 
     private func stopServingCache() {

@@ -8,12 +8,22 @@ options:
   generateEmptyDirectories: true
   groupSortPosition: top
 
+configs:
+  Debug: debug
+  Release: release
+  QwenTest: release
+
 settings:
+  configs:
+    QwenTest:
+      SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) SEMINARLY_TEST_BUILD"
   base:
     SWIFT_VERSION: "6.0"
     MACOSX_DEPLOYMENT_TARGET: "14.4"
 
 packages:
+  QwenASR:
+    path: Packages/QwenASR
   Sparkle:
     url: https://github.com/sparkle-project/Sparkle
     exactVersion: "2.10.0"
@@ -54,13 +64,21 @@ targets:
             destination: resources
             subpath: seminarly-cli
     settings:
+      configs:
+        QwenTest:
+          PRODUCT_BUNDLE_IDENTIFIER: ai.seminarly.Seminarly.QwenTest
+          PRODUCT_NAME: Seminarly Qwen Test
+          CURRENT_PROJECT_VERSION: "18"
+          # Ad-hoc local builds have no Team ID for hardened library validation.
+          ENABLE_HARDENED_RUNTIME: false
       base:
+        PRODUCT_MODULE_NAME: Seminarly
         PRODUCT_BUNDLE_IDENTIFIER: ai.seminarly.Seminarly
         INFOPLIST_FILE: Sources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Seminarly.entitlements
         PRODUCT_NAME: Seminarly
-        MARKETING_VERSION: "0.1.15"
-        CURRENT_PROJECT_VERSION: "16"
+        MARKETING_VERSION: "0.1.16"
+        CURRENT_PROJECT_VERSION: "17"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: true
@@ -69,6 +87,7 @@ targets:
     dependencies:
       - package: Sparkle
       - package: WhisperKit
+      - package: QwenASR
       - package: FluidAudio
       # Embed the self-contained CLI into Contents/Helpers/ and code-sign it on
       # copy (Developer ID + hardened runtime during a notarized archive). It is
@@ -120,6 +139,9 @@ targets:
     dependencies:
       - target: Seminarly
     settings:
+      configs:
+        QwenTest:
+          TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Seminarly Qwen Test.app/Contents/MacOS/Seminarly Qwen Test"
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Seminarly.app/Contents/MacOS/Seminarly"

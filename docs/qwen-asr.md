@@ -1,0 +1,232 @@
+# Qwen 0.6B mixed-quantization experiment
+
+Select **Settings → Transcription Model → Qwen 0.6B** on Apple Silicon.
+Whisper remains the default and existing preferences are preserved. Both engines
+share capture, model-switch lifecycle, transcript storage, and FluidAudio speaker
+attribution. Changes requested during a recording wait until saving completes;
+a failed switch restores the previous working model.
+
+The optional model is `moona3k/mlx-qwen3-asr-0.6b-4bit`, pinned to revision
+`4c59c533f95c84afb796655e814709034f826f04`. It uses a 4-bit text decoder,
+8-bit audio encoder, group size 64, and FP16 floating tensors. Its six required
+files total 542,094,393 bytes (~542 MB decimal), including tokenizer inputs. Loading also generates a temporary ~4.7 MB tokenizer workspace, removed after loading.
+Missing files are downloaded on selection, never bundled. File lengths and SHA-256
+hashes are checked before use. A complete cached installation loads without a
+network request. Cache location:
+
+`~/Library/Application Support/ai.seminarly/Models/Qwen3-ASR-0.6B/<revision>/`
+
+## Automatic local model discovery
+
+Selecting a model first searches existing installations. Users do not need to
+choose a folder or change their model selection:
+
+- Seminarly's pinned Qwen cache above and the existing Swift Hub flat layout at
+  `~/Documents/huggingface/models/<owner>/<repository>/`.
+- Python Hugging Face Hub snapshots at `~/.cache/huggingface/hub/`.
+- Absolute cache locations inherited by the app through `HF_HUB_CACHE`
+  (or legacy `HUGGINGFACE_HUB_CACHE`), `HF_HOME/hub`, or
+  `XDG_CACHE_HOME/huggingface/hub`. Finder-launched apps do not automatically
+  inherit shell configuration; Seminarly does not read shell startup files.
+
+Only known repositories and commit snapshot directories are inspected. There
+is no recursive disk scan, helper process, Python dependency, or network call
+for discovery. Whisper requires one of the app's offered Core ML variants;
+PyTorch/GGUF Whisper weights are not interchangeable with WhisperKit. Qwen
+requires the exact six pinned files above, validated by size and SHA-256, so
+other 0.6B quantizations or 1.7B models are not silently substituted.
+
+Complete installations load in place. A partial Qwen snapshot can supply valid
+files through symlinks in Seminarly's own cache, with only missing files
+downloaded. Hugging Face blob symlinks are resolved before verification; a
+removed source is rediscovered or downloaded on the next load. External caches
+are never modified or deleted. Writes are limited to Seminarly's cache:
+Whisper tokenizer files may be copied there, and Qwen's generated tokenizer
+uses a temporary per-load directory under
+`~/Library/Caches/ai.seminarly/QwenTokenizers/`.
+
+Whisper validates the required compiled bundles, tokenizer JSON and loaded
+model family. A failed local load tries another installation before the normal
+download path. Missing Whisper tokenizer files may still be downloaded without
+redownloading usable model weights. Settings show **Ready on this Mac** only
+after the selected model has actually loaded.
+
+`Packages/QwenASR` contains a small MIT-licensed upstream model/DSP subset and
+our mixed-precision loader. It uses pinned MLX Swift dependencies and the same
+Swift tokenizer package already used by WhisperKit. It does not bundle Python,
+a server, other ASR models, TTS, or a forced aligner. See that package's README
+for provenance and local adaptations. All MLX model access is serialized in an
+actor, with cancellation checks between generation steps.
+
+Discovery validation (2026-09-28): the optimized QwenTest suite completed
+536 cases with 0 failures and one unrelated old-database fixture skip. Both
+external-cache inference checks transcribed the 4.20-second Mandarin fixture;
+Qwen's read-only source retained exactly its six input files. The local package
+for this change uses test build 18.
+
+## Current limitations
+
+- Qwen requires Apple Silicon; Whisper remains available on Intel.
+- Qwen has no native word timestamps. This experiment transcribes contiguous
+  audio intervals up to eight seconds, preferring a low-energy boundary in the
+  last two seconds. Segment times are approximate audio bounds. Speaker
+  attribution still works on these bounds, but multiple speakers inside one
+  interval can receive a single label. This is not yet a replacement for
+  Whisper's finer segment alignment in rapid conversation.
+- No extra forced-aligner model is downloaded. Accurate alignment or
+  retranscription on diarized turns should be evaluated before making Qwen the
+  default for multi-speaker meetings.
+- Auto-detect is recommended for code-switching. Norwegian requires Whisper.
+- A model switch temporarily retains the previous model to allow rollback;
+  only the selected backend remains owned after a successful switch.
+- Public English smoke tests establish that the model runs, not multilingual
+  meeting accuracy. Evaluate Mandarin, Cantonese, English, code-switching,
+  proper nouns, silence, and overlapping speech before changing the default.
+
+## Validation
+
+Build with `./script/build_and_run.sh --build-only`. Run the regular test suite:
+
+```sh
+xcodegen generate
+xcodebuild test -project Seminarly.xcodeproj -scheme SeminarlyTests \
+  -destination 'platform=macOS' -derivedDataPath .build/DerivedData \
+  -clonedSourcePackagesDirPath .build/DerivedData/SourcePackages \
+  -disableAutomaticPackageResolution -skipPackageUpdates
+```
+
+The opt-in real inference test requires already downloaded, pinned model files
+and a local audio fixture. It never downloads models by itself:
+
+```sh
+TEST_RUNNER_SEMINARLY_QWEN_SMOKE_MODEL=/absolute/path/to/model \
+TEST_RUNNER_SEMINARLY_QWEN_SMOKE_AUDIO=/absolute/path/to/audio.wav \
+xcodebuild test -project Seminarly.xcodeproj -scheme SeminarlyTests \
+  -destination 'platform=macOS' -derivedDataPath .build/DerivedData \
+  -clonedSourcePackagesDirPath .build/DerivedData/SourcePackages \
+  -disableAutomaticPackageResolution -skipPackageUpdates \
+  -only-testing:SeminarlyTests/QwenASRTests/testLocalMixedQuantizationInference
+```
+
+The test prints `QWEN_SMOKE` lines with load/decode durations and transcript.
+For the engine-level silence/timeline test, also set
+`TEST_RUNNER_SEMINARLY_QWEN_SMOKE_ENGINE=1` and install the pinned model files
+in the app cache first. That test verifies the entire load/transcribe/finalize
+path and checks that 30 seconds of silence remain in the audio timeline.
+
+The discovery inference tests also load Qwen through a read-only Hub snapshot
+and Whisper through separate Hub model/tokenizer caches. Enable them with the
+Qwen variables above plus `TEST_RUNNER_SEMINARLY_WHISPER_SMOKE_MODEL` pointing
+to the variant directory containing the three `.mlmodelc` bundles, and
+`TEST_RUNNER_SEMINARLY_WHISPER_SMOKE_TOKENIZER` pointing directly to a folder
+containing `tokenizer.json` and `tokenizer_config.json`. Select
+`-only-testing:SeminarlyTests/ModelDiscoveryInferenceTests` to run those checks.
+They verify transcription and absence of large-weight copies; the Qwen test
+rejects any downloader invocation.
+
+Missing fixture variables produce an explicit skip, never a claimed inference pass.
+
+## Initial local results (2026-09-26)
+
+Debug build, Apple Silicon, unmeasured background system load. Public fixtures
+only; these are functional checks, not WER/CER benchmarks or release performance:
+
+| Fixture | Audio | Decode | Output language |
+| --- | ---: | ---: | --- |
+| mlx-audio-swift conversational_a.wav | 13.26 s | 4.75 s (cold Metal compilation) | English |
+| mlx-audio-swift conversational_fr.wav | 6.95 s | 0.96 s | French |
+| QwenLM/Qwen3-ASR official asr_zh.wav | 4.20 s | 0.38 s | Chinese |
+
+Mandarin output: `甚至出现交易几乎停滞的情况。`
+The same Mandarin fixture through TranscriptionEngine after 30 seconds of
+silence starts at 30.0 s, with language code `zh`.
+
+Sources: [Swift fixtures](https://github.com/Blaizzy/mlx-audio-swift/tree/01dec7c9bdce3088a6b6b7ab9f2e403458195efb/Tests/media),
+[official Mandarin fixture](https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen3-ASR-Repo/asr_zh.wav).
+
+
+Validation: 501 XCTest cases passed with both opt-in Mandarin checks enabled.
+Apple Silicon and Intel debug builds succeeded; Intel execution was not tested
+on physical Intel hardware. The Qwen option is disabled in Intel builds.
+
+## Local test app
+
+Run `./scripts/package-qwen-test.sh` on Apple Silicon to create a release-optimized,
+ad-hoc-signed **Seminarly Qwen Test.app** and DMG under `build/qwen-test.*/`.
+This is a local test package, not a notarized public release. The local ad-hoc
+configuration disables hardened runtime because it has no signing Team ID for
+framework validation; the production Release configuration retains it.
+
+The `QwenTest` configuration has its own bundle ID (`ai.seminarly.Seminarly.QwenTest`),
+preferences, database, backups and recordings in
+`~/Library/Application Support/Seminarly Qwen Test/`. It does not import the legacy
+production database or install production updates. Its embedded CLI uses that same
+test database. Qwen is selected by default; Whisper is still selectable in Settings.
+Downloaded model weights and existing AI account credentials/runtime are shared
+with the regular app, so models do not need to be downloaded twice.
+
+The optimized `QwenTest` configuration passed 502 tests on 2026-09-26, including
+profile isolation, real Mandarin inference and the engine silence/timeline test.
+The 4.20-second Mandarin fixture decoded in 0.24 seconds in this local run.
+
+## Audio retention removed
+
+The temporary **Save audio locally** experiment has been removed. New recordings
+save transcripts and speaker embeddings without writing the ASR input to WAV.
+Its recording/settings controls and audio export actions are no longer present.
+
+A dormant optional database field remains for compatibility with test builds
+that retained audio. Existing files are not automatically deleted; normal
+session or voice-data deletion still cleans up those references. The test host's
+isolated database profile remains in place. The branch includes upstream
+v0.1.15 (`543a62b`).
+
+Removal validation: the optimized QwenTest suite ran 522 cases; two opt-in
+inference cases were skipped. The only initial failure was the read-only SQLite
+probe against a copied WAL-mode fixture without sidecars. Converting that test
+copy to DELETE journal mode made the focused compatibility rerun pass; the app's
+database code and original store were unchanged. Recording lifecycle, ASR and
+legacy reference tests passed. The local package uses test build 17.
+
+## Same-audio diagnosis (2026-09-28)
+
+A Mandarin podcast with embedded English names exposed two porting errors:
+
+- The frontend retained the final centered STFT frame (3001 rather than 3000
+  frames for 30 seconds). It is now removed before normalization.
+- MLX `/` promoted integer frame counts to floating point. The valid encoder
+  length now uses integer floor division, preventing padded tail tokens from
+  entering the prompt and encoder output.
+
+Hann and Slaney coefficients now match the reference's Float64 construction
+followed by a Float32 cast. Synthetic reference fixtures cover frame boundaries,
+valid token counts, coefficient values and log-mel values without downloading
+weights or including podcast audio in the repository.
+
+Comparison used the same pinned mixed weights, exact audio samples and chunk
+boundaries, greedy decoding, no language/context hints, and `mlx-qwen3-asr 0.4.3`.
+The Swift package version is 0.31.3 but its bundled C++ MLX version is **0.31.1**;
+Python must use MLX 0.31.1 for this comparison. Of 20 selected groups (10 windows
+in each chunking mode), 18 matched verbatim, or 56 of 58 individual segments.
+The remaining differences were punctuation and the number of repeated words
+in one short segment. All 10 long-window outputs matched. Evernote substitution
+and the observed long-window repetition were corrected; the short-window
+repetition also occurs in Python on MLX 0.31.1. Founder and Bending Spoons errors
+remain in both runtimes. This is implementation comparison, not WER/CER accuracy.
+
+The same investigation corrected WhisperKit 0.18.0 options: nil language now
+explicitly enables language detection, and the precomputed prompt cache is
+disabled. Normal autoregressive KV caching and confidence/silence thresholds
+remain enabled. All 12 selected Whisper windows produced text after correction,
+including the five previously empty windows. The complete 90-window corpus has
+not been rerun with the final changes, and this does not guarantee completeness
+or eliminate all silence-related hallucinations.
+
+These fixes do not change the eight-second Qwen chunk limit, download size,
+or dependencies. Short ambiguous speech, English proper nouns and speaker
+alignment still need evaluation before changing the default engine.
+
+Before removing audio retention, the final ASR regression: optimized QwenTest suite completed 528 cases with 0 failures.
+Two opt-in inference cases and one old-database migration case were skipped
+because their fixture environment variables were unset. The separate podcast replay above used
+real local model weights. Those ASR fixes are included in the subsequent test build that removes audio retention.

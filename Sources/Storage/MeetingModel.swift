@@ -36,6 +36,17 @@ final class Meeting {
     var systemAudioPath: String?
     var micAudioPath: String?
 
+    // Compatibility with the retired WAV-retention experiment. New sessions
+    // never populate this field; keep existing references readable and removable
+    // through normal session/voice-data deletion without changing the schema.
+    var transcriptionAudioPath: String?
+
+    var transcriptionAudioURL: URL? {
+        guard let name = transcriptionAudioPath,
+              name.hasSuffix(".wav"), name == (name as NSString).lastPathComponent else { return nil }
+        return Self.audioDirectory.appendingPathComponent(name)
+    }
+
     // Speaker embeddings for lightweight re-clustering (~500KB vs ~115MB raw audio for 30min)
     var speakerEmbeddingsData: Data?
 
@@ -118,12 +129,11 @@ final class Meeting {
     }
 
     var hasAudioData: Bool {
-        systemAudioPath != nil
+        systemAudioPath != nil || micAudioPath != nil || transcriptionAudioPath != nil
     }
 
     static var audioDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        return appSupport.appendingPathComponent("Seminarly/Audio", isDirectory: true)
+        DatabaseStore.appSupportDirectory.appendingPathComponent("Audio", isDirectory: true)
     }
 
     func saveAudio(systemSamples: [Float], micSamples: [Float]?) {
@@ -165,6 +175,8 @@ final class Meeting {
     }
 
     func deleteAudioFiles() {
+        if let url = transcriptionAudioURL { try? FileManager.default.removeItem(at: url) }
+        transcriptionAudioPath = nil
         let dir = Self.audioDirectory
         if let f = systemAudioPath { try? FileManager.default.removeItem(at: dir.appendingPathComponent(f)) }
         if let f = micAudioPath { try? FileManager.default.removeItem(at: dir.appendingPathComponent(f)) }

@@ -222,7 +222,7 @@ struct ContentView: View {
             // download must not block diarization prep, and vice versa. The
             // engines own their load tasks, so repeat calls from a reopened
             // window join the in-flight work or no-op when already loaded.
-            async let transcription: Void = transcriptionEngine.loadModel(name: TranscriptionSettings.shared.whisperModel)
+            async let transcription: Void = transcriptionEngine.loadModel(name: TranscriptionSettings.shared.model)
             async let diarization: Void = diarizationEngine.prepareModels()
             _ = await (transcription, diarization)
             audioMonitor.startMonitoring()

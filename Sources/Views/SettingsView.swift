@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var modelDraft: String = ""
     @State private var modelSaveStatus: String?
     @State private var modelLoadTask: Task<Void, Never>?
+    @ObservedObject private var transcriptionEngine = TranscriptionEngine.shared
     @StateObject private var transcriptionSettings = TranscriptionSettings.shared
     @StateObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @StateObject private var updateSettings = UpdateSettings.shared
@@ -210,19 +211,25 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Whisper Model") {
-                    Picker("Model", selection: $transcriptionSettings.whisperModel) {
+                Section("Transcription Model") {
+                    Picker("Model", selection: $transcriptionSettings.model) {
+                        if QwenModelStore.isSupported {
+                            Text("Qwen 0.6B — 542 MB, experimental").tag(QwenModelStore.modelID)
+                        }
                         ForEach(whisperModels, id: \.self) { model in
                             Text(whisperModelDisplayName(model)).tag(model)
                         }
                     }
                     .pickerStyle(.menu)
-                    .onChange(of: transcriptionSettings.whisperModel) { _, newModel in
+                    .onChange(of: transcriptionSettings.model) { _, newModel in
                         // The engine defers the swap while a recording session
                         // (live or still finalizing) holds it, and applies the
                         // queued switch when the session ends. Cancel a picker
                         // request that has not reached the engine yet so rapid
                         // A→B→C changes remain latest-selection-wins.
+                        if newModel == QwenModelStore.modelID && transcriptionSettings.defaultLanguage == .no {
+                            transcriptionSettings.defaultLanguage = .auto
+                        }
                         modelLoadTask?.cancel()
                         modelLoadTask = Task { @MainActor in
                             guard !Task.isCancelled else { return }
@@ -230,14 +237,25 @@ struct SettingsView: View {
                         }
                     }
 
-                    Text("Installed models load from this Mac. Seminarly downloads only when the selected model is missing or incomplete. Loading after relaunch can take a few minutes; changes made during a recording apply after it is saved.")
+                    if transcriptionSettings.model == QwenModelStore.modelID {
+                        Text("Qwen runs locally on Apple Silicon. This experimental model uses approximate segment timing; short or overlapping speaker turns may be less precise. Auto-detect is recommended for mixed-language speech. Norwegian requires Whisper.")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                    }
+
+                    if transcriptionEngine.isModelLoaded && transcriptionEngine.loadedModelName == transcriptionSettings.model {
+                        Label("Ready on this Mac", systemImage: "checkmark.circle")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                    }
+                    Text("Seminarly automatically finds compatible models already on this Mac and downloads missing files when needed. No model folder setup is required. Changes made during a recording apply after it is saved.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
 
                 Section("Transcription Language") {
                     Picker("Default Language", selection: $transcriptionSettings.defaultLanguage) {
-                        ForEach(TranscriptionLanguage.allCases) { language in
+                        ForEach(TranscriptionLanguage.allCases.filter { transcriptionSettings.model != QwenModelStore.modelID || $0 != .no }) { language in
                             Text(language == .auto ? language.displayName : "\(language.displayName) (\(language.nativeName))")
                                 .tag(language)
                         }
@@ -312,7 +330,13 @@ struct SettingsView: View {
                         Spacer()
                     }
 
+                    #if SEMINARLY_TEST_BUILD
+                    Text("This test app is updated by installing a new test build.")
+                        .font(Typography.caption)
+                        .foregroundStyle(SeminarlyColors.textSecondary)
+                    #else
                     Toggle("Automatically check for and download updates", isOn: $updateSettings.automaticallyCheckForUpdates)
+                    #endif
 
                     if let version = automaticUpdates.status.version {
                         HStack {
@@ -337,7 +361,7 @@ struct SettingsView: View {
 
                 Section("About") {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
-                    Text("Seminarly uses local transcription (WhisperKit) and on-device audio capture (Core Audio Taps). Only the AI note-structuring call requires network access; costs depend on your selected provider's pricing.")
+                    Text("Seminarly uses local transcription (Whisper or Qwen) and on-device audio capture (Core Audio Taps). Only the AI note-structuring call requires network access; costs depend on your selected provider's pricing.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }
