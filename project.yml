@@ -68,7 +68,7 @@ targets:
         QwenTest:
           PRODUCT_BUNDLE_IDENTIFIER: ai.seminarly.Seminarly.QwenTest
           PRODUCT_NAME: Seminarly Qwen Test
-          CURRENT_PROJECT_VERSION: "17"
+          CURRENT_PROJECT_VERSION: "18"
           # Ad-hoc local builds have no Team ID for hardened library validation.
           ENABLE_HARDENED_RUNTIME: false
       base:

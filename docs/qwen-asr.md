@@ -9,12 +9,47 @@ a failed switch restores the previous working model.
 The optional model is `moona3k/mlx-qwen3-asr-0.6b-4bit`, pinned to revision
 `4c59c533f95c84afb796655e814709034f826f04`. It uses a 4-bit text decoder,
 8-bit audio encoder, group size 64, and FP16 floating tensors. Its six required
-files total 542,094,393 bytes (~542 MB decimal), including tokenizer inputs. Loading also generates a ~4.7 MB tokenizer cache.
-They are downloaded on selection, never bundled. File lengths and SHA-256
+files total 542,094,393 bytes (~542 MB decimal), including tokenizer inputs. Loading also generates a temporary ~4.7 MB tokenizer workspace, removed after loading.
+Missing files are downloaded on selection, never bundled. File lengths and SHA-256
 hashes are checked before use. A complete cached installation loads without a
 network request. Cache location:
 
 `~/Library/Application Support/ai.seminarly/Models/Qwen3-ASR-0.6B/<revision>/`
+
+## Automatic local model discovery
+
+Selecting a model first searches existing installations. Users do not need to
+choose a folder or change their model selection:
+
+- Seminarly's pinned Qwen cache above and the existing Swift Hub flat layout at
+  `~/Documents/huggingface/models/<owner>/<repository>/`.
+- Python Hugging Face Hub snapshots at `~/.cache/huggingface/hub/`.
+- Absolute cache locations inherited by the app through `HF_HUB_CACHE`
+  (or legacy `HUGGINGFACE_HUB_CACHE`), `HF_HOME/hub`, or
+  `XDG_CACHE_HOME/huggingface/hub`. Finder-launched apps do not automatically
+  inherit shell configuration; Seminarly does not read shell startup files.
+
+Only known repositories and commit snapshot directories are inspected. There
+is no recursive disk scan, helper process, Python dependency, or network call
+for discovery. Whisper requires one of the app's offered Core ML variants;
+PyTorch/GGUF Whisper weights are not interchangeable with WhisperKit. Qwen
+requires the exact six pinned files above, validated by size and SHA-256, so
+other 0.6B quantizations or 1.7B models are not silently substituted.
+
+Complete installations load in place. A partial Qwen snapshot can supply valid
+files through symlinks in Seminarly's own cache, with only missing files
+downloaded. Hugging Face blob symlinks are resolved before verification; a
+removed source is rediscovered or downloaded on the next load. External caches
+are never modified or deleted. Writes are limited to Seminarly's cache:
+Whisper tokenizer files may be copied there, and Qwen's generated tokenizer
+uses a temporary per-load directory under
+`~/Library/Caches/ai.seminarly/QwenTokenizers/`.
+
+Whisper validates the required compiled bundles, tokenizer JSON and loaded
+model family. A failed local load tries another installation before the normal
+download path. Missing Whisper tokenizer files may still be downloaded without
+redownloading usable model weights. Settings show **Ready on this Mac** only
+after the selected model has actually loaded.
 
 `Packages/QwenASR` contains a small MIT-licensed upstream model/DSP subset and
 our mixed-precision loader. It uses pinned MLX Swift dependencies and the same
@@ -22,6 +57,12 @@ Swift tokenizer package already used by WhisperKit. It does not bundle Python,
 a server, other ASR models, TTS, or a forced aligner. See that package's README
 for provenance and local adaptations. All MLX model access is serialized in an
 actor, with cancellation checks between generation steps.
+
+Discovery validation (2026-09-28): the optimized QwenTest suite completed
+536 cases with 0 failures and one unrelated old-database fixture skip. Both
+external-cache inference checks transcribed the 4.20-second Mandarin fixture;
+Qwen's read-only source retained exactly its six input files. The local package
+for this change uses test build 18.
 
 ## Current limitations
 
@@ -72,6 +113,16 @@ For the engine-level silence/timeline test, also set
 `TEST_RUNNER_SEMINARLY_QWEN_SMOKE_ENGINE=1` and install the pinned model files
 in the app cache first. That test verifies the entire load/transcribe/finalize
 path and checks that 30 seconds of silence remain in the audio timeline.
+
+The discovery inference tests also load Qwen through a read-only Hub snapshot
+and Whisper through separate Hub model/tokenizer caches. Enable them with the
+Qwen variables above plus `TEST_RUNNER_SEMINARLY_WHISPER_SMOKE_MODEL` pointing
+to the variant directory containing the three `.mlmodelc` bundles, and
+`TEST_RUNNER_SEMINARLY_WHISPER_SMOKE_TOKENIZER` pointing directly to a folder
+containing `tokenizer.json` and `tokenizer_config.json`. Select
+`-only-testing:SeminarlyTests/ModelDiscoveryInferenceTests` to run those checks.
+They verify transcription and absence of large-weight copies; the Qwen test
+rejects any downloader invocation.
 
 Missing fixture variables produce an explicit skip, never a claimed inference pass.
 

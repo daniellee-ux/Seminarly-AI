@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Darwin
 
 /// One immutable model recipe. Downloads are optional and live outside the app.
 enum QwenModelStore {
@@ -30,43 +31,101 @@ enum QwenModelStore {
             .appendingPathComponent("ai.seminarly/Models/Qwen3-ASR-0.6B/\(revision)")
     }
 
+    typealias Download = @Sendable (File, @escaping @Sendable (Int64) -> Void) async throws -> URL
+
     static func prepare(at directory: URL = directory,
+                        candidates: [URL]? = nil,
+                        manifest: [File] = files,
+                        download: Download = downloadFile,
+                        onDownload: @escaping @Sendable () async -> Void = {},
                         progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         let fm = FileManager.default
+        let sources = LocalModelDiscovery.unique([directory] + (candidates
+            ?? LocalModelDiscovery.current.repositoryDirectories(modelID, preferredRevision: revision)))
+        // Prefer a complete installation without creating anything in our cache.
+        for source in sources {
+            try Task.checkCancellation()
+            guard manifest.allSatisfy({ hasExpectedSize(source.appendingPathComponent($0.name), file: $0) }) else { continue }
+            var valid = true
+            for file in manifest {
+                if try !validLocalFile(source.appendingPathComponent(file.name), file: file) {
+                    valid = false
+                    break
+                }
+            }
+            if valid { progress(1); return source }
+        }
+
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-        let total = files.reduce(Int64(0)) { $0 + $1.size }
+        let total = manifest.reduce(Int64(0)) { $0 + $1.size }
         var completed: Int64 = 0
-        for file in files {
+        for file in manifest {
             try Task.checkCancellation()
             let destination = directory.appendingPathComponent(file.name)
-            if try !isValid(destination, file: file) {
-                let before = completed
-                let delegate = DownloadProgress { bytes in
-                    progress(Double(before + min(bytes, file.size)) / Double(total))
+            if try !validLocalFile(destination, file: file) {
+                let staging = directory.appendingPathComponent(".\(UUID().uuidString).partial")
+                defer { try? fm.removeItem(at: staging) }
+                var reusable: URL?
+                for source in sources where source.standardizedFileURL != directory.standardizedFileURL {
+                    let candidate = source.appendingPathComponent(file.name)
+                    if try validLocalFile(candidate, file: file) {
+                        reusable = candidate.resolvingSymlinksInPath()
+                        break
+                    }
                 }
-                let url = URL(string: "https://huggingface.co/\(modelID)/resolve/\(revision)/\(file.name)")!
-                let (temporary, response) = try await URLSession.shared.download(from: url, delegate: delegate)
-                defer { try? fm.removeItem(at: temporary) }
-                guard let response = response as? HTTPURLResponse, response.statusCode == 200,
-                      try isValid(temporary, file: file) else {
-                    throw StoreError.invalidDownload(file.name)
+                if let reusable {
+                    // A partial foreign snapshot can still supply the large weight
+                    // file. Only our directory gets links; its owner keeps its files.
+                    try fm.createSymbolicLink(at: staging, withDestinationURL: reusable)
+                } else {
+                    await onDownload()
+                    let before = completed
+                    let temporary = try await download(file) { bytes in
+                        progress(Double(before + min(bytes, file.size)) / Double(max(total, 1)))
+                    }
+                    defer { try? fm.removeItem(at: temporary) }
+                    guard try isValid(temporary, file: file) else { throw StoreError.invalidDownload(file.name) }
+                    try fm.moveItem(at: temporary, to: staging)
                 }
                 try Task.checkCancellation()
-                if fm.fileExists(atPath: destination.path) { try fm.removeItem(at: destination) }
-                try fm.moveItem(at: temporary, to: destination)
+                // Atomic replacement also replaces dangling links without following
+                // them, and avoids a missing-file interval between two app processes.
+                guard rename(staging.path, destination.path) == 0 else {
+                    throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                }
             }
             completed += file.size
-            progress(Double(completed) / Double(total))
+            progress(Double(completed) / Double(max(total, 1)))
         }
         return directory
     }
 
+    private static func downloadFile(_ file: File, progress: @escaping @Sendable (Int64) -> Void) async throws -> URL {
+        let url = URL(string: "https://huggingface.co/\(modelID)/resolve/\(revision)/\(file.name)")!
+        let (temporary, response) = try await URLSession.shared.download(from: url, delegate: DownloadProgress(report: progress))
+        guard let response = response as? HTTPURLResponse, response.statusCode == 200 else {
+            try? FileManager.default.removeItem(at: temporary)
+            throw StoreError.invalidDownload(file.name)
+        }
+        return temporary
+    }
+
+    private static func hasExpectedSize(_ url: URL, file: File) -> Bool {
+        // Resolve Hub snapshot symlinks to their blob files before inspecting size.
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.resolvingSymlinksInPath().path),
+              let size = attributes[.size] as? NSNumber else { return false }
+        return size.int64Value == file.size
+    }
+
+    private static func validLocalFile(_ url: URL, file: File) throws -> Bool {
+        do { return try isValid(url, file: file) }
+        catch is CancellationError { throw CancellationError() }
+        catch { return false } // Unreadable foreign caches must not block fallback.
+    }
+
     /// Verify complete files before loading; valid local installs never contact the network.
     static func isValid(_ url: URL, file: File) throws -> Bool {
-        // URL resource values may cache an old length across a repaired download.
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let size = attributes[.size] as? NSNumber,
-              size.int64Value == file.size else { return false }
+        guard hasExpectedSize(url, file: file) else { return false }
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         var digest = SHA256()

@@ -16,4 +16,6 @@ the decode loop; load separate quantization_config.json (decoder 4-bit, encoder
 QwenASRRuntime. Match the reference frontend by trimming the final centered
 STFT frame before normalization, building Hann/mel coefficients in Float64
 before casting to Float32, and using integer floor division for valid encoder
-token lengths. Update this provenance when refreshing vendored source.
+token lengths. Generate tokenizer files in an isolated per-load workspace,
+removed after loading, so external/read-only model folders stay untouched.
+Update this provenance when refreshing vendored source.

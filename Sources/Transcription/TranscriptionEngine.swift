@@ -208,25 +208,27 @@ final class TranscriptionEngine: ObservableObject {
                 await releasePreviousQwen(previousBackend)
                 return
             }
-            // Offline-first: a fully installed model loads straight from disk with
-            // zero network. WhisperKit.download always hits huggingface.co before
-            // touching the cache, so an unreachable network (offline, blocked, or a
-            // stalled system proxy) would otherwise hang or fail the load even
-            // though the model is already installed.
-            if let localFolder = Self.installedModelFolder(for: name) {
+            loadingProgress = "Looking for a local transcription model..."
+            let installations = LocalModelDiscovery.current.whisperInstallations(for: name)
+            for installation in installations {
                 do {
                     try Task.checkCancellation()
-                    loadingProgress = "Loading the installed transcription model..."
+                    loadingProgress = "Preparing the local transcription model..."
+                    if let tokenizer = installation.tokenizer,
+                       let repo = LocalModelDiscovery.whisperTokenizerRepo(for: name),
+                       let cacheRoot = Self.modelCacheBase {
+                        try LocalModelDiscovery.cacheWhisperTokenizer(from: tokenizer, repo: repo, cacheRoot: cacheRoot)
+                    }
                     let startedAt = Date()
-                    try await loadWhisperKit(from: localFolder, name: name, generation: generation)
+                    try await loadWhisperKit(from: installation.model, name: name, generation: generation)
                     let elapsed = String(format: "%.1f", Date().timeIntervalSince(startedAt))
-                    logger.notice("Loaded \(name, privacy: .public) from local cache in \(elapsed, privacy: .public)s")
+                    logger.notice("Loaded \(name, privacy: .public) from a local cache in \(elapsed, privacy: .public)s")
                     await releasePreviousQwen(previousBackend)
                     return
                 } catch is CancellationError {
                     throw CancellationError()
                 } catch {
-                    logger.error("Local load of \(name, privacy: .public) failed: \(error.localizedDescription, privacy: .public) — falling back to download")
+                    logger.error("Local model load failed: \(error.localizedDescription, privacy: .public); trying another installation")
                 }
             }
 
@@ -305,13 +307,24 @@ final class TranscriptionEngine: ObservableObject {
         await runtime.unload()
     }
 
+    private enum ModelDiscoveryError: LocalizedError {
+        case incompatibleWhisperModel
+        var errorDescription: String? { "The local Whisper model does not match the selected model family." }
+    }
+
     private func loadWhisperKit(from folder: URL, name: String, generation: Int) async throws {
         let candidate = try await WhisperKit(
             modelFolder: folder.path,
+            tokenizerFolder: Self.modelCacheBase,
             verbose: false,
             logLevel: .none,
             download: false
         )
+        if let expectedRepo = LocalModelDiscovery.whisperTokenizerRepo(for: name),
+           candidate.modelVariant.description != expectedRepo.replacingOccurrences(of: "openai/whisper-", with: "") {
+            await candidate.unloadModels()
+            throw ModelDiscoveryError.incompatibleWhisperModel
+        }
         // WhisperKit/Core ML may finish normally after Task.cancel(). Only the
         // latest generation may publish its model or clear the current status.
         try Task.checkCancellation()
@@ -326,14 +339,19 @@ final class TranscriptionEngine: ObservableObject {
 
     private func loadQwen(name: String, generation: Int) async throws {
         guard QwenModelStore.isSupported else { throw QwenModelStore.StoreError.unsupportedHardware }
-        loadingProgress = "Preparing Qwen transcription model..."
-        isDownloading = true
-        let directory = try await QwenModelStore.prepare { [weak self] fraction in
+        loadingProgress = "Looking for a local Qwen model..."
+        let directory = try await QwenModelStore.prepare(onDownload: { [weak self] in
+            await MainActor.run { [weak self] in
+                guard let self, self.loadGeneration == generation, self.loadingModelName == name,
+                      !self.isModelLoaded else { return }
+                self.isDownloading = true
+                self.loadingProgress = "Downloading Qwen transcription model..."
+            }
+        }) { [weak self] fraction in
             Task { @MainActor [weak self] in
                 guard let self, self.loadGeneration == generation,
-                      self.loadingModelName == name, self.isDownloading else { return }
+                      self.loadingModelName == name, !self.isModelLoaded else { return }
                 self.downloadFraction = max(self.downloadFraction, fraction)
-                self.loadingProgress = "Preparing Qwen transcription model... \(Int(self.downloadFraction * 100))%"
             }
         }
         try Task.checkCancellation()
@@ -424,59 +442,6 @@ final class TranscriptionEngine: ObservableObject {
     nonisolated static var modelCacheBase: URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
             .appendingPathComponent("huggingface")
-    }
-
-    /// The folder `WhisperKit.download` would produce for this variant, or nil
-    /// unless the model looks installed AND its tokenizer is cached (both are
-    /// needed for a zero-network load): <modelCacheBase>/models/argmaxinc/whisperkit-coreml/<variant>.
-    /// A partial download that slips past this check still fails the WhisperKit
-    /// init, which then falls back to the download path.
-    nonisolated static func installedModelFolder(for variant: String) -> URL? {
-        guard let base = modelCacheBase else { return nil }
-        return installedModelFolder(for: variant, cacheBase: base)
-    }
-
-    /// Testable form of the local fast-path predicate. The app wrapper above
-    /// supplies its pinned cache root; tests supply an isolated temporary root.
-    nonisolated static func installedModelFolder(for variant: String, cacheBase: URL) -> URL? {
-        let fm = FileManager.default
-        let folder = cacheBase.appendingPathComponent("models/argmaxinc/whisperkit-coreml/\(variant)")
-        // WhisperKit requires exactly these three compiled bundles; the prefill
-        // bundle and the *.json files are optional.
-        for bundle in ["MelSpectrogram.mlmodelc", "AudioEncoder.mlmodelc", "TextDecoder.mlmodelc"] {
-            guard fm.fileExists(atPath: folder.appendingPathComponent(bundle).path) else { return nil }
-        }
-        guard isTokenizerCached(for: variant, cacheBase: cacheBase) else { return nil }
-        return folder
-    }
-
-    /// WhisperKit resolves the tokenizer repo from the loaded model's dims and
-    /// fetches it from the network when not cached — even with download:false.
-    /// Both files must exist locally for a fully-offline load; this mirrors
-    /// WhisperKit's variant→tokenizer mapping for the variants Seminarly offers.
-    nonisolated static func isTokenizerCached(for variant: String) -> Bool {
-        guard let base = modelCacheBase else { return false }
-        return isTokenizerCached(for: variant, cacheBase: base)
-    }
-
-    nonisolated static func isTokenizerCached(for variant: String, cacheBase: URL) -> Bool {
-        let repo: String
-        if variant.contains("large-v3") {
-            repo = "openai/whisper-large-v3"
-        } else if variant.contains("small") {
-            repo = "openai/whisper-small"
-        } else if variant.contains("base") {
-            repo = "openai/whisper-base"
-        } else if variant.contains("tiny") {
-            repo = "openai/whisper-tiny"
-        } else {
-            return false // unknown variant — use the download path
-        }
-        let fm = FileManager.default
-        let dir = cacheBase.appendingPathComponent("models/\(repo)")
-        return ["tokenizer.json", "tokenizer_config.json"].allSatisfy {
-            fm.fileExists(atPath: dir.appendingPathComponent($0).path)
-        }
     }
 
     func appendAudio(_ samples: [Float]) {

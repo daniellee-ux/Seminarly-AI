@@ -14,7 +14,7 @@ public actor QwenASRRuntime {
 
     public init() {}
 
-    public func load(from directory: URL) async throws {
+    public func load(from directory: URL, tokenizerCacheRoot: URL? = nil) async throws {
         try Task.checkCancellation()
         let config = try JSONDecoder().decode(Qwen3ASRConfig.self,
             from: Data(contentsOf: directory.appendingPathComponent("config.json")))
@@ -25,8 +25,14 @@ public actor QwenASRRuntime {
             throw RuntimeError.unsupportedQuantization
         }
         let candidate = Qwen3ASRModel(config)
-        try Qwen3ASRModel.generateTokenizerJSON(in: directory)
-        candidate.tokenizer = try await AutoTokenizer.from(modelFolder: directory)
+        let root = tokenizerCacheRoot ?? FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("ai.seminarly/QwenTokenizers")
+        // Each load owns its tokenizer workspace; concurrent test/production
+        // processes cannot mix generated files from different model sources.
+        let tokenizerDirectory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: tokenizerDirectory) }
+        try Qwen3ASRModel.generateTokenizerJSON(in: directory, outputDirectory: tokenizerDirectory)
+        candidate.tokenizer = try await AutoTokenizer.from(modelFolder: tokenizerDirectory)
         try Task.checkCancellation()
         let weights = Qwen3ASRModel.sanitize(weights: try MLX.loadArrays(
             url: directory.appendingPathComponent("weights.safetensors")))

@@ -115,7 +115,7 @@ final class TranscriptionEngineCacheTests: XCTestCase {
         try createTokenizer(repo: "openai/whisper-large-v3", in: cacheBase)
 
         XCTAssertEqual(
-            TranscriptionEngine.installedModelFolder(for: variant, cacheBase: cacheBase),
+            completeInstallation(for: variant, cacheBase: cacheBase),
             folder
         )
     }
@@ -130,7 +130,7 @@ final class TranscriptionEngineCacheTests: XCTestCase {
             try createTokenizer(repo: "openai/whisper-small", in: cacheBase)
 
             XCTAssertNil(
-                TranscriptionEngine.installedModelFolder(for: variant, cacheBase: cacheBase),
+                completeInstallation(for: variant, cacheBase: cacheBase),
                 "Missing \(missingBundle) must reject the local fast path"
             )
         }
@@ -146,7 +146,7 @@ final class TranscriptionEngineCacheTests: XCTestCase {
             try createTokenizer(repo: "openai/whisper-base", in: cacheBase, omitting: missingFile)
 
             XCTAssertNil(
-                TranscriptionEngine.installedModelFolder(for: variant, cacheBase: cacheBase),
+                completeInstallation(for: variant, cacheBase: cacheBase),
                 "Missing \(missingFile) must reject the local fast path"
             )
         }
@@ -169,7 +169,7 @@ final class TranscriptionEngineCacheTests: XCTestCase {
             try createTokenizer(repo: tokenizerRepo, in: cacheBase)
 
             XCTAssertEqual(
-                TranscriptionEngine.installedModelFolder(for: variant, cacheBase: cacheBase),
+                completeInstallation(for: variant, cacheBase: cacheBase),
                 folder,
                 "\(variant) should use tokenizer repo \(tokenizerRepo)"
             )
@@ -183,7 +183,13 @@ final class TranscriptionEngineCacheTests: XCTestCase {
         let variant = "custom-whisper-model"
         _ = try createModelBundles(for: variant, in: cacheBase)
 
-        XCTAssertNil(TranscriptionEngine.installedModelFolder(for: variant, cacheBase: cacheBase))
+        XCTAssertNil(completeInstallation(for: variant, cacheBase: cacheBase))
+    }
+
+    private func completeInstallation(for variant: String, cacheBase: URL) -> URL? {
+        let installation = LocalModelDiscovery(swiftCacheRoot: cacheBase, hubCacheRoots: [])
+            .whisperInstallations(for: variant).first
+        return installation?.tokenizer == nil ? nil : installation?.model
     }
 
     private func makeTemporaryCache() throws -> URL {
@@ -224,7 +230,7 @@ final class TranscriptionEngineCacheTests: XCTestCase {
             XCTAssertTrue(
                 FileManager.default.createFile(
                     atPath: folder.appendingPathComponent(file).path,
-                    contents: Data()
+                    contents: Data("{}".utf8)
                 )
             )
         }

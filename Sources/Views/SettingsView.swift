@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var modelDraft: String = ""
     @State private var modelSaveStatus: String?
     @State private var modelLoadTask: Task<Void, Never>?
+    @ObservedObject private var transcriptionEngine = TranscriptionEngine.shared
     @StateObject private var transcriptionSettings = TranscriptionSettings.shared
     @StateObject private var summaryLanguageSettings = SummaryLanguageSettings.shared
     @StateObject private var updateSettings = UpdateSettings.shared
@@ -242,7 +243,12 @@ struct SettingsView: View {
                             .foregroundStyle(SeminarlyColors.textSecondary)
                     }
 
-                    Text("Installed models load from this Mac. Seminarly downloads only when the selected model is missing or incomplete. Loading after relaunch can take a few minutes; changes made during a recording apply after it is saved.")
+                    if transcriptionEngine.isModelLoaded && transcriptionEngine.loadedModelName == transcriptionSettings.model {
+                        Label("Ready on this Mac", systemImage: "checkmark.circle")
+                            .font(Typography.caption)
+                            .foregroundStyle(SeminarlyColors.textSecondary)
+                    }
+                    Text("Seminarly automatically finds compatible models already on this Mac and downloads missing files when needed. No model folder setup is required. Changes made during a recording apply after it is saved.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

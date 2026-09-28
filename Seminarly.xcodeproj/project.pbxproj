@@ -10,6 +10,7 @@
 		02BED202E990079CF123CB89 /* NeuralDiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9877B7574FD700253F62FF15 /* NeuralDiarizationEngine.swift */; };
 		061D063341CCF1B8B0BD3DBC /* TranscriptionSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED86513DC928D10A4AD8591A /* TranscriptionSettings.swift */; };
 		077D9F519D02E6C100B739AC /* SessionLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189EE3B1745B331CE700A4FC /* SessionLookup.swift */; };
+		08BA5988FCB048820D269370 /* LocalModelDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D489A07891738ED6F201CC90 /* LocalModelDiscovery.swift */; };
 		08F978A443863CEEB70C3926 /* AudioFormatConverterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A51A3D81B5C1D3066CEF0C54 /* AudioFormatConverterTests.swift */; };
 		097A46D37CDCC3822A2241BF /* TemplateSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7EFEC64A836FC701F31232 /* TemplateSettings.swift */; };
 		09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */; };
@@ -35,6 +36,7 @@
 		31388B68A62FAF9939159BAB /* CodableModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1ADE195415707A7D45D383 /* CodableModelTests.swift */; };
 		313A89CDA957292C8B30F23A /* AudioSourceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2011D7802EAC790AA377EFDE /* AudioSourceMonitor.swift */; };
 		34DC4012ED36C898D30FEB81 /* SessionLookup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 189EE3B1745B331CE700A4FC /* SessionLookup.swift */; };
+		3724BCD1CB01F7A15E80A0BB /* ModelDiscoveryInferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7EE37C53444E20FA7FC490 /* ModelDiscoveryInferenceTests.swift */; };
 		37DB64DC3AAEA8F76A6D82F6 /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8FA98217C86529B02229D39 /* KeychainStore.swift */; };
 		38CF0A704C1398454ADA2870 /* ChatGPTRuntimeDownload.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E56B8DEECDBE790D2FE28D8 /* ChatGPTRuntimeDownload.swift */; };
 		3B5C4E07AE277FC6040CE168 /* SpeakerEmbedding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D31F0D336330A248D7E9EF8 /* SpeakerEmbedding.swift */; };
@@ -84,6 +86,7 @@
 		7FD7C5F6999612CA7B6D7D37 /* ChatGPTRuntimeInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 082262687B9E9205BF6DBD36 /* ChatGPTRuntimeInstaller.swift */; };
 		8194694358B9DF2867262DB8 /* MeetingMarkdownRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */; };
 		83C146EB7D8F883BD986499D /* DiarizationEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */; };
+		86390D9B74367CCF3B354636 /* QwenModelDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8F11BEB7DBCF9EA708D326C /* QwenModelDiscoveryTests.swift */; };
 		8795C68452BF6BC99B398EA8 /* SeminarlyCLI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07C7E2C4EE048A8D9DFFE82D /* SeminarlyCLI.swift */; };
 		884D35DB09191E5080FB77C1 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = C8D90C05F385C0EF41502CFA /* ArgumentParser */; };
 		888D4FE35E5167CA6AE88BB9 /* TranscriptionEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 830845872D8058AC0DE9E6A4 /* TranscriptionEngineTests.swift */; };
@@ -125,6 +128,7 @@
 		EBF6C473E13F95D251C6261C /* QwenASR in Frameworks */ = {isa = PBXBuildFile; productRef = 91139440968FA4879E9AC32D /* QwenASR */; };
 		EC7813615E21C22D6E9A0945 /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FF02FADB4E83B9F73313F71 /* RecordingSession.swift */; };
 		ECCB4A8391BF8A961103FE9F /* DatabaseErrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */; };
+		EEAEC2641D97D3DCA563B454 /* LocalModelDiscoveryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C35BEFD781921770C45034B3 /* LocalModelDiscoveryTests.swift */; };
 		F0AFACE2FE245FEDA50518DE /* UpdateBannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D60962B7A4D96637E48113D /* UpdateBannerView.swift */; };
 		F1B6E3F395BD6AD1A30E5CFC /* MeetingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BD96750494903A36134D6E /* MeetingModel.swift */; };
 		F47FAEDEA65FB389F747480A /* SeminarlyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F46E52AC557F7104AEB565D5 /* SeminarlyApp.swift */; };
@@ -233,6 +237,7 @@
 		572D28B5EDFB24B724697891 /* SummaryLanguage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguage.swift; sourceTree = "<group>"; };
 		582B18F272268549F5F54328 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		588D1CC22EFB86BAF04A5AA7 /* UpdateChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateChecker.swift; sourceTree = "<group>"; };
+		5F7EE37C53444E20FA7FC490 /* ModelDiscoveryInferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDiscoveryInferenceTests.swift; sourceTree = "<group>"; };
 		60EC4D05F182BD3B566B8B6A /* AudioCaptureManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCaptureManager.swift; sourceTree = "<group>"; };
 		627114C6B0F93E94EBD12D95 /* OpenAICompatibleProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAICompatibleProvider.swift; sourceTree = "<group>"; };
 		6689D8F37F02CD59FDF059D7 /* QwenASRTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenASRTests.swift; sourceTree = "<group>"; };
@@ -288,12 +293,14 @@
 		BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryLanguageTests.swift; sourceTree = "<group>"; };
 		BC1C13C784D22EA6892736BF /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		BDB4BD26226E2159D5AF74B7 /* LLMResponseSanitizerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMResponseSanitizerTests.swift; sourceTree = "<group>"; };
+		C35BEFD781921770C45034B3 /* LocalModelDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelDiscoveryTests.swift; sourceTree = "<group>"; };
 		C662AA5020C9B439FCD1EFDB /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C76EB55618FE8289799D46EB /* MarkdownNoteEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownNoteEditor.swift; sourceTree = "<group>"; };
 		D362AE710CD761B295AFE01E /* ChatGPTAccountStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTAccountStore.swift; sourceTree = "<group>"; };
 		D36EDF8A615F3BD8381DAB86 /* SearchCommand.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchCommand.swift; sourceTree = "<group>"; };
 		D38E7EB98FBBF3CBA0A09089 /* ChatGPTRuntime.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ChatGPTRuntime.json; sourceTree = "<group>"; };
 		D460CF4363C70841D56B72D9 /* SemanticVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersion.swift; sourceTree = "<group>"; };
+		D489A07891738ED6F201CC90 /* LocalModelDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalModelDiscovery.swift; sourceTree = "<group>"; };
 		D6B0359972A8C91531555550 /* AppUpdaterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppUpdaterTests.swift; sourceTree = "<group>"; };
 		D769202B0B31CAEBB6CDF131 /* GeminiProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiProvider.swift; sourceTree = "<group>"; };
 		D87426EF66BC4205D5C10E67 /* DiarizationEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationEngineTests.swift; sourceTree = "<group>"; };
@@ -305,6 +312,7 @@
 		E6AD43EE82BF8168BCD9787F /* SpeakerAttribution.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeakerAttribution.swift; sourceTree = "<group>"; };
 		E6B8B0F5C69EB9F65FA30B38 /* DiarizationAudioTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationAudioTests.swift; sourceTree = "<group>"; };
 		E7B44FEA6BC39BCDB826FD57 /* LLMSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMSettings.swift; sourceTree = "<group>"; };
+		E8F11BEB7DBCF9EA708D326C /* QwenModelDiscoveryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenModelDiscoveryTests.swift; sourceTree = "<group>"; };
 		E8FA98217C86529B02229D39 /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		ED86513DC928D10A4AD8591A /* TranscriptionSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionSettings.swift; sourceTree = "<group>"; };
 		EF58A59895428D2591DB58F5 /* LLMProviderCatalogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMProviderCatalogTests.swift; sourceTree = "<group>"; };
@@ -505,6 +513,7 @@
 		945D7B18F330E8B53D80D91D /* Transcription */ = {
 			isa = PBXGroup;
 			children = (
+				D489A07891738ED6F201CC90 /* LocalModelDiscovery.swift */,
 				9007010C8467F4E3EEFE3ECB /* QwenAudioChunks.swift */,
 				356115D4780719E82A22DF88 /* QwenModelStore.swift */,
 				0900F6D8B02A754E92F02C9E /* TranscriptionEngine.swift */,
@@ -559,17 +568,20 @@
 				91A38B032D5DCEDF17A9AD90 /* LanguageAwareDiarizationTests.swift */,
 				EF58A59895428D2591DB58F5 /* LLMProviderCatalogTests.swift */,
 				BDB4BD26226E2159D5AF74B7 /* LLMResponseSanitizerTests.swift */,
+				C35BEFD781921770C45034B3 /* LocalModelDiscoveryTests.swift */,
 				4373F8BD4EEDAE9A4E7B5D60 /* MarkdownListPrefixTests.swift */,
 				341B120D939B8413092BDCAB /* MeetingAudioCompatibilityTests.swift */,
 				E54F1906243B01FFCE252E00 /* MeetingMarkdownRendererTests.swift */,
 				F8D49402F0591D85B1801210 /* MeetingModelTests.swift */,
 				3367B9D98B71D48FE8F168B9 /* MFCCExtractorTests.swift */,
+				5F7EE37C53444E20FA7FC490 /* ModelDiscoveryInferenceTests.swift */,
 				265CA05565F97D1DFCD494E8 /* NoteStructuringParsingTests.swift */,
 				24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */,
 				2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */,
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
 				6689D8F37F02CD59FDF059D7 /* QwenASRTests.swift */,
 				238A91EDC9939266384A9382 /* QwenFrontendTests.swift */,
+				E8F11BEB7DBCF9EA708D326C /* QwenModelDiscoveryTests.swift */,
 				8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */,
 				3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */,
 				9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */,
@@ -829,17 +841,20 @@
 				4D58D1C0B0D2F7FC64EF927C /* LLMProviderCatalogTests.swift in Sources */,
 				729ACDF1C9CBF2B82FC8DB7C /* LLMResponseSanitizerTests.swift in Sources */,
 				F8D591649E9948662F091233 /* LanguageAwareDiarizationTests.swift in Sources */,
+				EEAEC2641D97D3DCA563B454 /* LocalModelDiscoveryTests.swift in Sources */,
 				5CE54A14756F20DA045B25F0 /* MFCCExtractorTests.swift in Sources */,
 				BA3EF45D20C4CD45A137D6B0 /* MarkdownListPrefixTests.swift in Sources */,
 				9CEE938BE08736A55E8F67B4 /* MeetingAudioCompatibilityTests.swift in Sources */,
 				73226D2CB6CC054F3ED3E299 /* MeetingMarkdownRendererTests.swift in Sources */,
 				B2FCCA19C9AE9C0FBCEE5FBF /* MeetingModelTests.swift in Sources */,
+				3724BCD1CB01F7A15E80A0BB /* ModelDiscoveryInferenceTests.swift in Sources */,
 				7A6932285AC7DDFF52DF2734 /* NoteStructuringParsingTests.swift in Sources */,
 				5CAB6C3A7C986808A29C93EA /* NoteTemplateTests.swift in Sources */,
 				9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */,
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
 				2FEAF25883A0736C972EDC4D /* QwenASRTests.swift in Sources */,
 				10224554ADE7E81DA881210E /* QwenFrontendTests.swift in Sources */,
+				86390D9B74367CCF3B354636 /* QwenModelDiscoveryTests.swift in Sources */,
 				4FC99892F85190C8A43916F8 /* RecordingSessionTests.swift in Sources */,
 				264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */,
 				09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */,
@@ -910,6 +925,7 @@
 				EAACDE7F9E587D612B126BEF /* LLMProvider.swift in Sources */,
 				30853DF6249D05C969434F0E /* LLMProviderCatalog.swift in Sources */,
 				4E747E200CB180C9D52D7681 /* LLMSettings.swift in Sources */,
+				08BA5988FCB048820D269370 /* LocalModelDiscovery.swift in Sources */,
 				58A1066578E3E85A2DE1DF84 /* MFCCExtractor.swift in Sources */,
 				9307751FDE6AC09C48E9F3EE /* MarkdownNoteEditor.swift in Sources */,
 				8E726DC8D69C2AC7E743595F /* MeetingDetailView.swift in Sources */,
@@ -1253,7 +1269,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 17;
+				CURRENT_PROJECT_VERSION = 18;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

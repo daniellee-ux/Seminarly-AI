@@ -1208,8 +1208,9 @@ public class Qwen3ASRModel: Module {
     // MARK: - Tokenizer JSON Generation
 
     /// Generate `tokenizer.json` from `vocab.json` + `merges.txt` + `tokenizer_config.json`
-    static func generateTokenizerJSON(in modelDir: URL) throws {
-        let tokenizerJSONPath = modelDir.appendingPathComponent("tokenizer.json")
+    static func generateTokenizerJSON(in modelDir: URL, outputDirectory: URL) throws {
+        try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+        let tokenizerJSONPath = outputDirectory.appendingPathComponent("tokenizer.json")
         // Rebuild from the pinned inputs so a damaged generated cache repairs itself.
 
         let vocabURL = modelDir.appendingPathComponent("vocab.json")
@@ -1321,6 +1322,10 @@ public class Qwen3ASRModel: Module {
         }
         """
 
+        // Keep configuration local to the generated tokenizer; no writes to the
+        // original model folder, including read-only Hugging Face snapshots.
+        try Data(contentsOf: tokenizerConfigURL)
+            .write(to: outputDirectory.appendingPathComponent("tokenizer_config.json"), options: .atomic)
         try tokenizerJSON.write(to: tokenizerJSONPath, atomically: true, encoding: .utf8)
         print("Generated tokenizer.json at: \(tokenizerJSONPath.path)")
     }
