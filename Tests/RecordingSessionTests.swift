@@ -11,11 +11,7 @@ final class RecordingSessionTests: XCTestCase {
     }
 
     @MainActor
-    private func makeSession(
-        clock: TestClock,
-        shouldRetainAudio: @escaping () -> Bool = { false },
-        saveRecordingAudio: @escaping @Sendable ([Float]) async throws -> String? = { _ in nil }
-    ) throws -> (RecordingSession, ModelContainer) {
+    private func makeSession(clock: TestClock) throws -> (RecordingSession, ModelContainer) {
         let config = ModelConfiguration(schema: SeminarlyApp.schema, isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: SeminarlyApp.schema, configurations: [config])
         let capture = AudioCaptureManager()
@@ -26,74 +22,9 @@ final class RecordingSessionTests: XCTestCase {
             captureManager: capture,
             transcriptionEngine: TranscriptionEngine(),
             diarizationEngine: NeuralDiarizationEngine(),
-            now: { clock.time },
-            shouldRetainAudio: shouldRetainAudio,
-            saveRecordingAudio: saveRecordingAudio
+            now: { clock.time }
         )
         return (session, container)
-    }
-
-    private actor AudioWriterSpy {
-        var calls = 0
-        func save(_ samples: [Float]) -> String? {
-            calls += 1
-            return "fixture.transcription.wav"
-        }
-    }
-
-    @MainActor
-    private final class RetentionPreference {
-        var enabled = false
-    }
-
-    @MainActor
-    func testRetentionUsesPreferenceAtStartAndLinksAudioToSavedSession() async throws {
-        let preference = RetentionPreference()
-        preference.enabled = true
-        let writer = AudioWriterSpy()
-        let (session, container) = try makeSession(clock: TestClock(),
-            shouldRetainAudio: { preference.enabled },
-            saveRecordingAudio: { await writer.save($0) })
-        session.startRecording(modelContext: container.mainContext)
-        try await waitForCapture(session)
-        preference.enabled = false
-        await session.stopRecording()?.value
-        let calls = await writer.calls
-        XCTAssertEqual(calls, 1)
-        XCTAssertEqual(session.savedMeeting?.transcriptionAudioPath, "fixture.transcription.wav")
-        XCTAssertNil(session.audioSaveError)
-    }
-
-    @MainActor
-    func testDisabledRetentionDoesNotWriteEvenIfEnabledMidRecording() async throws {
-        let preference = RetentionPreference()
-        let writer = AudioWriterSpy()
-        let (session, container) = try makeSession(clock: TestClock(),
-            shouldRetainAudio: { preference.enabled },
-            saveRecordingAudio: { await writer.save($0) })
-        session.startRecording(modelContext: container.mainContext)
-        try await waitForCapture(session)
-        preference.enabled = true
-        await session.stopRecording()?.value
-        let calls = await writer.calls
-        XCTAssertEqual(calls, 0)
-        XCTAssertNil(session.savedMeeting?.transcriptionAudioPath)
-    }
-
-    @MainActor
-    func testAudioWriteFailureStillSavesTranscriptAndReleasesSession() async throws {
-        let (session, container) = try makeSession(clock: TestClock(),
-            shouldRetainAudio: { true },
-            saveRecordingAudio: { _ in throw CocoaError(.fileWriteOutOfSpace) })
-        session.startRecording(modelContext: container.mainContext)
-        try await waitForCapture(session)
-        session.transcriptionEngine.liveText = "Transcript survives a full disk"
-        await session.stopRecording()?.value
-        XCTAssertEqual(session.savedMeeting?.transcript?.rawText, "Transcript survives a full disk")
-        XCTAssertNil(session.savedMeeting?.transcriptionAudioPath)
-        XCTAssertNotNil(session.audioSaveError)
-        XCTAssertFalse(session.ownsRecordingSession)
-        XCTAssertFalse(session.hasBackgroundActivity)
     }
 
     @MainActor

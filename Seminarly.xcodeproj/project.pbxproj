@@ -41,7 +41,6 @@
 		3C2D2CFCA56270E0F60129E2 /* AutomaticUpdateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AA7209E28DF4D7FE9571C79 /* AutomaticUpdateTests.swift */; };
 		3D2FEFE3FC3680671520291A /* MeetingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 94BD96750494903A36134D6E /* MeetingModel.swift */; };
 		3F35DD165E15227BC2979789 /* DatabaseCheckpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = 853B2A2DD758396CC53DC36A /* DatabaseCheckpoint.swift */; };
-		40908CEC2B1B17DDAE1DBC95 /* RecordingAudioStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0897F0EC38B909B832F7CAA5 /* RecordingAudioStoreTests.swift */; };
 		430D6B958C0A36A57821B258 /* SemanticVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = D460CF4363C70841D56B72D9 /* SemanticVersion.swift */; };
 		45A19BA13654C5D30DDA98AC /* SummaryLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBFC6AD165900AA317608633 /* SummaryLanguageTests.swift */; };
 		46177C81A0C684777B7808E3 /* ListCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47E102078703CD4DAD162330 /* ListCommand.swift */; };
@@ -94,8 +93,8 @@
 		991A2C2E4DC17237C6EDF5FD /* GeminiProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D769202B0B31CAEBB6CDF131 /* GeminiProvider.swift */; };
 		9AE061D30E4A730512AA8AFC /* DiarizationAudioTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6B8B0F5C69EB9F65FA30B38 /* DiarizationAudioTests.swift */; };
 		9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */; };
+		9CEE938BE08736A55E8F67B4 /* MeetingAudioCompatibilityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 341B120D939B8413092BDCAB /* MeetingAudioCompatibilityTests.swift */; };
 		9F9D4CF21B60C9790B042211 /* NoteOutputSchema.swift in Sources */ = {isa = PBXBuildFile; fileRef = E428EB031BD99240D5B6143D /* NoteOutputSchema.swift */; };
-		A00C2275AD5AA421DD886670 /* RecordingAudioStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7242499F89E2EB088AF843C7 /* RecordingAudioStore.swift */; };
 		A1937F91F6E79F0DBE296A1A /* MeetingSpeakerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6A5AF26A5D0743CD6F359A /* MeetingSpeakerControls.swift */; };
 		AC5416D24451304BF72017EC /* DiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFE1DF556BD19A1EB3CFF0D /* DiarizationEngine.swift */; };
 		B2FCCA19C9AE9C0FBCEE5FBF /* MeetingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D49402F0591D85B1801210 /* MeetingModelTests.swift */; };
@@ -194,7 +193,6 @@
 		0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingMarkdownRenderer.swift; sourceTree = "<group>"; };
 		07C7E2C4EE048A8D9DFFE82D /* SeminarlyCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLI.swift; sourceTree = "<group>"; };
 		082262687B9E9205BF6DBD36 /* ChatGPTRuntimeInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTRuntimeInstaller.swift; sourceTree = "<group>"; };
-		0897F0EC38B909B832F7CAA5 /* RecordingAudioStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioStoreTests.swift; sourceTree = "<group>"; };
 		08F27B4B04E1F0F10D8FFA75 /* DatabaseErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseErrorView.swift; sourceTree = "<group>"; };
 		0900F6D8B02A754E92F02C9E /* TranscriptionEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionEngine.swift; sourceTree = "<group>"; };
 		0A0665D84EC1E9C5268661FB /* UpdateDownloadCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateDownloadCache.swift; sourceTree = "<group>"; };
@@ -219,6 +217,7 @@
 		2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptTemplatesLanguageTests.swift; sourceTree = "<group>"; };
 		318B4552BF12A15100BFD41A /* QwenASR */ = {isa = PBXFileReference; lastKnownFileType = folder; name = QwenASR; path = Packages/QwenASR; sourceTree = SOURCE_ROOT; };
 		3367B9D98B71D48FE8F168B9 /* MFCCExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MFCCExtractorTests.swift; sourceTree = "<group>"; };
+		341B120D939B8413092BDCAB /* MeetingAudioCompatibilityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingAudioCompatibilityTests.swift; sourceTree = "<group>"; };
 		35150228257E97CD1838BB43 /* TranscriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptTests.swift; sourceTree = "<group>"; };
 		356115D4780719E82A22DF88 /* QwenModelStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenModelStore.swift; sourceTree = "<group>"; };
 		3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticVersionTests.swift; sourceTree = "<group>"; };
@@ -245,7 +244,6 @@
 		708F89D50651B27D9BE23137 /* UpdateSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateSettings.swift; sourceTree = "<group>"; };
 		71025614BFFFA23D8CF5F4AF /* ReleaseArchitecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReleaseArchitecture.swift; sourceTree = "<group>"; };
 		723F4C91D76B4357C6B9ECAC /* LLMProviderCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMProviderCatalog.swift; sourceTree = "<group>"; };
-		7242499F89E2EB088AF843C7 /* RecordingAudioStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingAudioStore.swift; sourceTree = "<group>"; };
 		7A1ADE195415707A7D45D383 /* CodableModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableModelTests.swift; sourceTree = "<group>"; };
 		7A64F2E12B28E0793C7DAFDD /* ChatGPTNoteProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatGPTNoteProvider.swift; sourceTree = "<group>"; };
 		7DBC9152ACCA52E023313C17 /* MeetingDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetailView.swift; sourceTree = "<group>"; };
@@ -387,7 +385,6 @@
 				88870F818336A1C4677C1657 /* CoreAudioUtils.swift */,
 				8E74373F4A4A05A9D090A01D /* MicrophoneCaptureManager.swift */,
 				2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */,
-				7242499F89E2EB088AF843C7 /* RecordingAudioStore.swift */,
 				8FF02FADB4E83B9F73313F71 /* RecordingSession.swift */,
 			);
 			path = Audio;
@@ -563,6 +560,7 @@
 				EF58A59895428D2591DB58F5 /* LLMProviderCatalogTests.swift */,
 				BDB4BD26226E2159D5AF74B7 /* LLMResponseSanitizerTests.swift */,
 				4373F8BD4EEDAE9A4E7B5D60 /* MarkdownListPrefixTests.swift */,
+				341B120D939B8413092BDCAB /* MeetingAudioCompatibilityTests.swift */,
 				E54F1906243B01FFCE252E00 /* MeetingMarkdownRendererTests.swift */,
 				F8D49402F0591D85B1801210 /* MeetingModelTests.swift */,
 				3367B9D98B71D48FE8F168B9 /* MFCCExtractorTests.swift */,
@@ -572,7 +570,6 @@
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
 				6689D8F37F02CD59FDF059D7 /* QwenASRTests.swift */,
 				238A91EDC9939266384A9382 /* QwenFrontendTests.swift */,
-				0897F0EC38B909B832F7CAA5 /* RecordingAudioStoreTests.swift */,
 				8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */,
 				3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */,
 				9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */,
@@ -834,6 +831,7 @@
 				F8D591649E9948662F091233 /* LanguageAwareDiarizationTests.swift in Sources */,
 				5CE54A14756F20DA045B25F0 /* MFCCExtractorTests.swift in Sources */,
 				BA3EF45D20C4CD45A137D6B0 /* MarkdownListPrefixTests.swift in Sources */,
+				9CEE938BE08736A55E8F67B4 /* MeetingAudioCompatibilityTests.swift in Sources */,
 				73226D2CB6CC054F3ED3E299 /* MeetingMarkdownRendererTests.swift in Sources */,
 				B2FCCA19C9AE9C0FBCEE5FBF /* MeetingModelTests.swift in Sources */,
 				7A6932285AC7DDFF52DF2734 /* NoteStructuringParsingTests.swift in Sources */,
@@ -842,7 +840,6 @@
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
 				2FEAF25883A0736C972EDC4D /* QwenASRTests.swift in Sources */,
 				10224554ADE7E81DA881210E /* QwenFrontendTests.swift in Sources */,
-				40908CEC2B1B17DDAE1DBC95 /* RecordingAudioStoreTests.swift in Sources */,
 				4FC99892F85190C8A43916F8 /* RecordingSessionTests.swift in Sources */,
 				264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */,
 				09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */,
@@ -931,7 +928,6 @@
 				2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */,
 				660469D97AE22E0CBE334EA5 /* QwenAudioChunks.swift in Sources */,
 				F57AC94511080B576BC3D90E /* QwenModelStore.swift in Sources */,
-				A00C2275AD5AA421DD886670 /* RecordingAudioStore.swift in Sources */,
 				EC7813615E21C22D6E9A0945 /* RecordingSession.swift in Sources */,
 				CBD75ED7F232B718B51816A1 /* RecordingView.swift in Sources */,
 				55625974F4942AE55F1318AB /* ReleaseArchitecture.swift in Sources */,
@@ -1257,7 +1253,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/Seminarly.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 16;
+				CURRENT_PROJECT_VERSION = 17;
 				ENABLE_HARDENED_RUNTIME = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

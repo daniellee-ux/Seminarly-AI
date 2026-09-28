@@ -23,8 +23,6 @@ final class RecordingSession {
     private(set) var savedMeeting: Meeting?
     private(set) var captureState: CaptureState = .idle
 
-    var audioSaveError: String?
-
     var selectedTemplate = TemplateSettings.shared.defaultTemplate
     var customInstructions = TemplateSettings.shared.customInstructions
     var selectedLanguage = TranscriptionSettings.shared.defaultLanguage
@@ -41,31 +39,18 @@ final class RecordingSession {
     @ObservationIgnored private var runningSince: TimeInterval?
     @ObservationIgnored private var lastCheckpointTime: TimeInterval = 0
     @ObservationIgnored private let now: () -> TimeInterval
-    @ObservationIgnored private let shouldRetainAudio: () -> Bool
-    @ObservationIgnored private let saveRecordingAudio: @Sendable ([Float]) async throws -> String?
-    @ObservationIgnored private var retainAudioForSession = false
     @ObservationIgnored private var settingsSubscriptions = Set<AnyCancellable>()
 
     init(
         captureManager: AudioCaptureManager = AudioCaptureManager(),
         transcriptionEngine: TranscriptionEngine = .shared,
         diarizationEngine: NeuralDiarizationEngine = .shared,
-        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
-        shouldRetainAudio: @escaping () -> Bool = {
-            UserDefaults.standard.bool(forKey: RecordingAudioStore.preferenceKey)
-        },
-        saveRecordingAudio: @escaping @Sendable ([Float]) async throws -> String? = { samples in
-            try await Task.detached(priority: .utility) {
-                try RecordingAudioStore.save(samples: samples)
-            }.value
-        }
+        now: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
     ) {
         self.captureManager = captureManager
         self.transcriptionEngine = transcriptionEngine
         self.diarizationEngine = diarizationEngine
         self.now = now
-        self.shouldRetainAudio = shouldRetainAudio
-        self.saveRecordingAudio = saveRecordingAudio
         captureManager.onStateChange = { [weak self] state in
             self?.captureStateChanged(state)
         }
@@ -119,9 +104,6 @@ final class RecordingSession {
             _ = captureManager.stopRecording()
         }
         self.modelContext = modelContext
-        // Preference changes during capture apply to the next session.
-        retainAudioForSession = shouldRetainAudio()
-        audioSaveError = nil
         transcriptionEngine.beginSession()
         ownsRecordingSession = true
         captureDidStart = false
@@ -273,17 +255,6 @@ final class RecordingSession {
                 releaseRecordingSession()
                 AppDelegate.endSavePipeline()
             }
-            var retainedAudioPath: String?
-            if retainAudioForSession {
-                processingStatus = "Saving audio..."
-                do {
-                    retainedAudioPath = try await saveRecordingAudio(recording.combinedSamples)
-                } catch {
-                    audioSaveError = "Audio could not be saved: \(error.localizedDescription) Transcription will still be saved."
-                    logger.error("Audio retention failed: \(error.localizedDescription, privacy: .public)")
-                }
-            }
-
             // 1. Finalize transcription
             processingStatus = "Finalizing transcription..."
             let segments = await transcriptionEngine.finalizeTranscription()
@@ -343,7 +314,6 @@ final class RecordingSession {
                 appSource: captureManager.selectedProcess?.name,
                 appBundleID: captureManager.selectedProcess?.bundleID
             )
-            meeting.transcriptionAudioPath = retainedAudioPath
             meeting.transcript = transcript
             transcript.meeting = meeting
 

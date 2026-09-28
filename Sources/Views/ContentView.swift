@@ -198,14 +198,6 @@ struct ContentView: View {
         } message: { meeting in
             Text("Are you sure you want to delete \"\(meeting.title)\"? This cannot be undone.")
         }
-        .alert("Audio Was Not Saved", isPresented: Binding(
-            get: { appState.recordingSession.audioSaveError != nil },
-            set: { if !$0 { appState.recordingSession.audioSaveError = nil } }
-        )) {
-            Button("OK", role: .cancel) { appState.recordingSession.audioSaveError = nil }
-        } message: {
-            Text(appState.recordingSession.audioSaveError ?? "")
-        }
         .alert("Database Recovered", isPresented: $showRecoveryNoticeAlert) {
             Button("OK", role: .cancel) { }
         } message: {

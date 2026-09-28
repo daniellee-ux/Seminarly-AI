@@ -16,7 +16,6 @@ struct SettingsView: View {
     @StateObject private var updateSettings = UpdateSettings.shared
     @StateObject private var automaticUpdates = AppUpdater.shared.automatic
     @AppStorage("autoDetectAudioSources") private var autoDetectEnabled = true
-    @AppStorage(RecordingAudioStore.preferenceKey) private var retainRecordingAudio = false
 
     /// Selection-only proxy: holds either a preset case, `.matchTranscript`, or
     /// the sentinel `.custom("")` (meaning "show the custom field"). Decoupling
@@ -292,13 +291,6 @@ struct SettingsView: View {
                     }
 
                     Text("Language for AI-generated summary notes. Independent of the transcription language. Match Transcript detects the transcript language before generation.")
-                        .font(Typography.caption)
-                        .foregroundStyle(SeminarlyColors.textSecondary)
-                }
-
-                Section("Local Audio") {
-                    Toggle("Save audio locally", isOn: $retainRecordingAudio)
-                    Text("Keep audio from new recordings as a WAV on this Mac. About 230 MB per hour. Export it from the session’s Export menu; deleting the session also deletes its saved audio. Changes apply to the next recording.")
                         .font(Typography.caption)
                         .foregroundStyle(SeminarlyColors.textSecondary)
                 }

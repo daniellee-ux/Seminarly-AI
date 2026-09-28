@@ -36,8 +36,9 @@ final class Meeting {
     var systemAudioPath: String?
     var micAudioPath: String?
 
-    // Optional retained ASR input, separate from legacy source-channel recordings.
-    // Relative to audioDirectory; nil on existing sessions and when retention is off.
+    // Compatibility with the retired WAV-retention experiment. New sessions
+    // never populate this field; keep existing references readable and removable
+    // through normal session/voice-data deletion without changing the schema.
     var transcriptionAudioPath: String?
 
     var transcriptionAudioURL: URL? {
