@@ -104,6 +104,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        #if !SEMINARLY_TEST_BUILD
+        AppUpdater.shared.automatic.start()
+        #endif
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
@@ -206,7 +212,7 @@ struct SeminarlyApp: App {
             // spot for "Check for Updates…". Manual checks report every outcome.
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") {
-                    UpdateChecker.shared.checkForUpdates(mode: .manual)
+                    AppUpdater.shared.checkForUpdates()
                 }
             }
         }
