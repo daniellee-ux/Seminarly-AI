@@ -14,6 +14,7 @@
 | `AppUpdaterTests.swift` | Signed updater defaults, CPU feeds, Sparkle delegate hooks, and recording-save restart protection |
 | `AudioBufferAccumulatorTests.swift` | Thread-safe buffer, format conversion |
 | `AudioFormatConverterTests.swift` | 48kHz/44.1kHz → 16kHz mono conversion |
+| `RecordingAudioStoreTests.swift` | Lossless WAV save/read, failed/empty writes, persisted audio references and old-store migration |
 | `RecordingSessionTests.swift` | Window-independent capture, close/reopen/minimize, elapsed time, explicit pause, startup/error cleanup, and saving without a view |
 | `ClaudeAPIClientTests.swift` | Keychain save/load/delete |
 | `CodableModelTests.swift` | Codable round-trips for storage models |

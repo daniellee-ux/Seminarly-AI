@@ -35,6 +35,7 @@ struct RecordingView: View {
     @State private var showRegenerateSheet: Bool = false
 
     @State private var showTranscript = true
+    @AppStorage(RecordingAudioStore.preferenceKey) private var retainRecordingAudio = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -121,6 +122,17 @@ struct RecordingView: View {
             setupToolbar
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.xs)
+
+            HStack {
+                Toggle("Save audio locally", isOn: $retainRecordingAudio)
+                    .toggleStyle(.checkbox)
+                Spacer()
+                Text("WAV · about 230 MB/hour")
+                    .foregroundStyle(SeminarlyColors.textSecondary)
+            }
+            .font(Typography.caption)
+            .padding(.horizontal, Spacing.md)
+            .padding(.bottom, Spacing.xs)
 
             Divider()
 
@@ -247,6 +259,17 @@ struct RecordingView: View {
             }
 
             Spacer()
+
+            if let url = meeting.transcriptionAudioURL {
+                Button {
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                } label: {
+                    Label("Saved Audio", systemImage: "waveform")
+                        .font(Typography.caption)
+                }
+                .buttonStyle(.plain)
+                .help("Show the saved WAV in Finder")
+            }
 
             if let error = enhancement.error(for: meeting) {
                 Label(error, systemImage: "exclamationmark.triangle")

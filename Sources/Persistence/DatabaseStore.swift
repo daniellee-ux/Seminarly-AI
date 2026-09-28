@@ -9,7 +9,11 @@ enum DatabaseStore {
     }
 
     static var appSupportDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        // Test hosts must not migrate or back up the user's installed app data.
+        let isTesting = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+        let appSupport = isTesting
+            ? FileManager.default.temporaryDirectory.appendingPathComponent("SeminarlyTests-\(ProcessInfo.processInfo.processIdentifier)", isDirectory: true)
+            : FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         #if SEMINARLY_TEST_BUILD
         return appSupport.appendingPathComponent("Seminarly Qwen Test", isDirectory: true)
         #else

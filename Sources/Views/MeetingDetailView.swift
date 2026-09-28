@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct MeetingDetailView: View {
     @Environment(\.modelContext) private var modelContext
@@ -10,6 +11,8 @@ struct MeetingDetailView: View {
     @State private var editedTitle: String = ""
     @State private var editableUserNotes: String = ""
     @State private var showRegenerateSheet = false
+    @State private var audioExportError: String?
+    @State private var isExportingAudio = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +39,14 @@ struct MeetingDetailView: View {
             .padding(Spacing.md)
         }
         .background(SeminarlyColors.background)
+        .alert("Could Not Export Audio", isPresented: Binding(
+            get: { audioExportError != nil },
+            set: { if !$0 { audioExportError = nil } }
+        )) {
+            Button("OK", role: .cancel) { audioExportError = nil }
+        } message: {
+            Text(audioExportError ?? "")
+        }
         .sheet(isPresented: $showRegenerateSheet) {
             RegenerateNotesSheet(
                 initialTemplate: meeting.structuredNote?.resolvedTemplate ?? TemplateSettings.shared.defaultTemplate,
@@ -159,6 +170,16 @@ struct MeetingDetailView: View {
                     }
                     Button("Copy to Clipboard") {
                         copyToClipboard()
+                    }
+                    Divider()
+                    Button(isExportingAudio ? "Exporting Audio…" : "Export Audio (WAV)…") {
+                        exportAudio()
+                    }
+                    .disabled(meeting.transcriptionAudioURL == nil || isExportingAudio)
+                    if let url = meeting.transcriptionAudioURL {
+                        Button("Show Audio in Finder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([url])
+                        }
                     }
                 } label: {
                     Label("Export", systemImage: "arrow.up.doc")
@@ -310,6 +331,28 @@ struct MeetingDetailView: View {
             summaryLanguage: language,
             modelContext: modelContext
         )
+    }
+
+    private func exportAudio() {
+        guard let source = meeting.transcriptionAudioURL else { return }
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.wav]
+        panel.nameFieldStringValue = "\(meeting.title.replacingOccurrences(of: "/", with: "-")).wav"
+        panel.begin { response in
+            guard response == .OK, let destination = panel.url else { return }
+            isExportingAudio = true
+            Task { @MainActor in
+                defer { isExportingAudio = false }
+                do {
+                    try await Task.detached(priority: .utility) {
+                        let data = try Data(contentsOf: source, options: .mappedIfSafe)
+                        try data.write(to: destination, options: .atomic)
+                    }.value
+                } catch {
+                    audioExportError = error.localizedDescription
+                }
+            }
+        }
     }
 
     private func exportMarkdown() {

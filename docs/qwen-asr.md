@@ -117,3 +117,32 @@ with the regular app, so models do not need to be downloaded twice.
 The optimized `QwenTest` configuration passed 502 tests on 2026-09-26, including
 profile isolation, real Mandarin inference and the engine silence/timeline test.
 The 4.20-second Mandarin fixture decoded in 0.24 seconds in this local run.
+
+## Retain audio for repeatable comparisons
+
+Enable **Save audio locally** before starting a recording (also available in
+Settings → Local Audio). The preference is off by default and is captured at
+recording start; changing it during capture affects the next session.
+
+Stopping the recording writes its exact ASR input as a 16 kHz mono Float32 WAV,
+using macOS AVFoundation with no new dependency. This is the capture mix, so it
+includes the microphone when enabled. It costs about 230 MB/hour (173 MB for
+45 minutes). Only one mixed track is retained; speaker embeddings remain the
+basis for re-clustering. This is save-on-stop, not continuous crash recovery.
+
+Click **Saved Audio** after recording to reveal the WAV, or open the saved session
+and choose **Export → Export Audio (WAV)… / Show Audio in Finder**. Audio stays
+in the app's existing `Audio` directory. Deleting the session or its voice data
+also removes the internal WAV; separately exported copies are independent.
+Previous sessions without saved audio cannot be recovered from their transcripts.
+An audio write failure is surfaced and does not abort transcription saving.
+
+`RecordingAudioStoreTests` verifies lossless sample round-tripping across write
+boundaries, WAV format, failed/empty writes, persistent references and migration
+of a supplied old-store copy. `RecordingSessionTests` covers retention policy and
+save failures. Test hosts use a temporary database profile rather than the
+installed app's recordings.
+
+Validation on 2026-09-28: all 523 tests passed in the optimized QwenTest
+configuration, including real Qwen inference and migration of a copy of the
+previous test app database. The branch includes upstream v0.1.15 (`543a62b`).
