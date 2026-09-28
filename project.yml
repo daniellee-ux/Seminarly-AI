@@ -77,8 +77,8 @@ targets:
         INFOPLIST_FILE: Sources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/Seminarly.entitlements
         PRODUCT_NAME: Seminarly
-        MARKETING_VERSION: "0.1.15"
-        CURRENT_PROJECT_VERSION: "16"
+        MARKETING_VERSION: "0.1.16"
+        CURRENT_PROJECT_VERSION: "17"
         SWIFT_STRICT_CONCURRENCY: complete
         CODE_SIGN_IDENTITY: "-"
         ENABLE_HARDENED_RUNTIME: true
