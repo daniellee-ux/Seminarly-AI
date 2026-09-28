@@ -14,12 +14,14 @@
 		097A46D37CDCC3822A2241BF /* TemplateSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7EFEC64A836FC701F31232 /* TemplateSettings.swift */; };
 		09B30105E76725B4352F1385 /* SeminarlyCLIInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */; };
 		0A486D6FC69BAB7431510694 /* KeychainStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA68520F74553000BE94F18A /* KeychainStoreTests.swift */; };
+		10224554ADE7E81DA881210E /* QwenFrontendTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238A91EDC9939266384A9382 /* QwenFrontendTests.swift */; };
 		138FDF555692413FC5D0AE68 /* AudioDetectionBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC4C31506A3FEF0C0565651B /* AudioDetectionBanner.swift */; };
 		176988E4F55C6A8E90D6C1AA /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C186469B8F8014AFC557D7D /* ContentView.swift */; };
 		17919FC32DFF9621D5064971 /* UpdateCheckerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05787983746741B60516ABED /* UpdateCheckerTests.swift */; };
 		1B19C57EB441B1C7D29286F2 /* SpeakerAttributionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3C559177B9092B05463B1CA /* SpeakerAttributionTests.swift */; };
 		1D413441C2EC2CD3375E3005 /* PathCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F10E3BAEBD75EA5F07B6D45 /* PathCommand.swift */; };
 		1E281C74DA35EC31B7D74B5A /* SearchCommand.swift in Sources */ = {isa = PBXBuildFile; fileRef = D36EDF8A615F3BD8381DAB86 /* SearchCommand.swift */; };
+		2305AB6815EB20EEE0362FC9 /* qwen-frontend-golden.json in Resources */ = {isa = PBXBuildFile; fileRef = 9B58F89291D63359E2B22A33 /* qwen-frontend-golden.json */; };
 		2380BC6BA20BF1AFA7B9EA35 /* PromptTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC213A17EA411A454DCFB8F4 /* PromptTemplates.swift */; };
 		24CFA6FBB989237ACC3F2527 /* SpeakerEmbedding.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D31F0D336330A248D7E9EF8 /* SpeakerEmbedding.swift */; };
 		264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */; };
@@ -97,6 +99,7 @@
 		A1937F91F6E79F0DBE296A1A /* MeetingSpeakerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE6A5AF26A5D0743CD6F359A /* MeetingSpeakerControls.swift */; };
 		AC5416D24451304BF72017EC /* DiarizationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9CFE1DF556BD19A1EB3CFF0D /* DiarizationEngine.swift */; };
 		B2FCCA19C9AE9C0FBCEE5FBF /* MeetingModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8D49402F0591D85B1801210 /* MeetingModelTests.swift */; };
+		B34C4F3D480169FE35AB0254 /* qwen-frontend-coefficients.json in Resources */ = {isa = PBXBuildFile; fileRef = 0354E9A9C74796693309410A /* qwen-frontend-coefficients.json */; };
 		B3AF3FF4D79B7B6F37619B8A /* ChatGPTRuntime.json in Resources */ = {isa = PBXBuildFile; fileRef = D38E7EB98FBBF3CBA0A09089 /* ChatGPTRuntime.json */; };
 		B490BDB123CAC48F2DDB3854 /* TranscriptionEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0900F6D8B02A754E92F02C9E /* TranscriptionEngine.swift */; };
 		B844B878FA9CC82CC348D091 /* CoreAudioUtils.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88870F818336A1C4677C1657 /* CoreAudioUtils.swift */; };
@@ -186,6 +189,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		0354E9A9C74796693309410A /* qwen-frontend-coefficients.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "qwen-frontend-coefficients.json"; sourceTree = "<group>"; };
 		05787983746741B60516ABED /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
 		0617F18EDDA653AFAC18B9A0 /* MeetingMarkdownRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingMarkdownRenderer.swift; sourceTree = "<group>"; };
 		07C7E2C4EE048A8D9DFFE82D /* SeminarlyCLI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLI.swift; sourceTree = "<group>"; };
@@ -206,6 +210,7 @@
 		2011D7802EAC790AA377EFDE /* AudioSourceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioSourceMonitor.swift; sourceTree = "<group>"; };
 		2092BAD22E38D646CA4AAE17 /* CachedUpdateServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedUpdateServer.swift; sourceTree = "<group>"; };
 		220744F42A1788F0FE2D6AB4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		238A91EDC9939266384A9382 /* QwenFrontendTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QwenFrontendTests.swift; sourceTree = "<group>"; };
 		2469C952DE0832A0125C40D2 /* ProcessTapManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessTapManager.swift; sourceTree = "<group>"; };
 		24880F6B9E28562AA8EBF0CC /* NoteTemplateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteTemplateTests.swift; sourceTree = "<group>"; };
 		265CA05565F97D1DFCD494E8 /* NoteStructuringParsingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteStructuringParsingTests.swift; sourceTree = "<group>"; };
@@ -265,6 +270,7 @@
 		960B5416B0953F3EF88B3BAB /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		9877B7574FD700253F62FF15 /* NeuralDiarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NeuralDiarizationEngine.swift; sourceTree = "<group>"; };
 		9AA7209E28DF4D7FE9571C79 /* AutomaticUpdateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomaticUpdateTests.swift; sourceTree = "<group>"; };
+		9B58F89291D63359E2B22A33 /* qwen-frontend-golden.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "qwen-frontend-golden.json"; sourceTree = "<group>"; };
 		9CFE1DF556BD19A1EB3CFF0D /* DiarizationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiarizationEngine.swift; sourceTree = "<group>"; };
 		9F4558CAE01CE2FCCF0E53AB /* SeminarlyCLIInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeminarlyCLIInstallerTests.swift; sourceTree = "<group>"; };
 		9F92D33D3963F33E09094FB5 /* AudioFormatConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioFormatConverter.swift; sourceTree = "<group>"; };
@@ -515,6 +521,8 @@
 			isa = PBXGroup;
 			children = (
 				68F988157305BE68364FD202 /* fake-codex.py */,
+				0354E9A9C74796693309410A /* qwen-frontend-coefficients.json */,
+				9B58F89291D63359E2B22A33 /* qwen-frontend-golden.json */,
 			);
 			path = Fixtures;
 			sourceTree = "<group>";
@@ -563,6 +571,7 @@
 				2EAE57A6478CFD856050E18F /* PromptTemplatesLanguageTests.swift */,
 				1D3D73C713AF6C48A7965274 /* PromptTemplatesTests.swift */,
 				6689D8F37F02CD59FDF059D7 /* QwenASRTests.swift */,
+				238A91EDC9939266384A9382 /* QwenFrontendTests.swift */,
 				0897F0EC38B909B832F7CAA5 /* RecordingAudioStoreTests.swift */,
 				8B6313A01FBE8F4493C6E9B6 /* RecordingSessionTests.swift */,
 				3E2D64DCE0914E23A49899C4 /* SemanticVersionTests.swift */,
@@ -757,6 +766,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				2C4F8D5F68470E05EBC7D9B8 /* fake-codex.py in Resources */,
+				B34C4F3D480169FE35AB0254 /* qwen-frontend-coefficients.json in Resources */,
+				2305AB6815EB20EEE0362FC9 /* qwen-frontend-golden.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -830,6 +841,7 @@
 				9CB8E06AF6CF12FA3615D890 /* PromptTemplatesLanguageTests.swift in Sources */,
 				DCB56C4444FEB5152634B745 /* PromptTemplatesTests.swift in Sources */,
 				2FEAF25883A0736C972EDC4D /* QwenASRTests.swift in Sources */,
+				10224554ADE7E81DA881210E /* QwenFrontendTests.swift in Sources */,
 				40908CEC2B1B17DDAE1DBC95 /* RecordingAudioStoreTests.swift in Sources */,
 				4FC99892F85190C8A43916F8 /* RecordingSessionTests.swift in Sources */,
 				264DF0EEE30C845F5C539886 /* SemanticVersionTests.swift in Sources */,

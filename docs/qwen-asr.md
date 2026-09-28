@@ -146,3 +146,47 @@ installed app's recordings.
 Validation on 2026-09-28: all 523 tests passed in the optimized QwenTest
 configuration, including real Qwen inference and migration of a copy of the
 previous test app database. The branch includes upstream v0.1.15 (`543a62b`).
+
+
+## Same-audio diagnosis (2026-09-28)
+
+A Mandarin podcast with embedded English names exposed two porting errors:
+
+- The frontend retained the final centered STFT frame (3001 rather than 3000
+  frames for 30 seconds). It is now removed before normalization.
+- MLX `/` promoted integer frame counts to floating point. The valid encoder
+  length now uses integer floor division, preventing padded tail tokens from
+  entering the prompt and encoder output.
+
+Hann and Slaney coefficients now match the reference's Float64 construction
+followed by a Float32 cast. Synthetic reference fixtures cover frame boundaries,
+valid token counts, coefficient values and log-mel values without downloading
+weights or including podcast audio in the repository.
+
+Comparison used the same pinned mixed weights, exact audio samples and chunk
+boundaries, greedy decoding, no language/context hints, and `mlx-qwen3-asr 0.4.3`.
+The Swift package version is 0.31.3 but its bundled C++ MLX version is **0.31.1**;
+Python must use MLX 0.31.1 for this comparison. Of 20 selected groups (10 windows
+in each chunking mode), 18 matched verbatim, or 56 of 58 individual segments.
+The remaining differences were punctuation and the number of repeated words
+in one short segment. All 10 long-window outputs matched. Evernote substitution
+and the observed long-window repetition were corrected; the short-window
+repetition also occurs in Python on MLX 0.31.1. Founder and Bending Spoons errors
+remain in both runtimes. This is implementation comparison, not WER/CER accuracy.
+
+The same investigation corrected WhisperKit 0.18.0 options: nil language now
+explicitly enables language detection, and the precomputed prompt cache is
+disabled. Normal autoregressive KV caching and confidence/silence thresholds
+remain enabled. All 12 selected Whisper windows produced text after correction,
+including the five previously empty windows. The complete 90-window corpus has
+not been rerun with the final changes, and this does not guarantee completeness
+or eliminate all silence-related hallucinations.
+
+These fixes do not change the eight-second Qwen chunk limit, download size,
+or dependencies. Short ambiguous speech, English proper nouns and speaker
+alignment still need evaluation before changing the default engine.
+
+Final regression: optimized QwenTest suite completed 528 cases with 0 failures.
+Two opt-in inference cases and one old-database migration case were skipped
+because their fixture environment variables were unset. The separate podcast replay above used
+real local model weights. The installed test app was not repackaged in this run.

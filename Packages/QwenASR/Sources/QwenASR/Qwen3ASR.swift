@@ -44,12 +44,14 @@ private let qwen3ASRLanguageAliases: [String: String] = [
 ]
 
 func getFeatExtractOutputLengths(_ inputLengths: MLXArray) -> MLXArray {
+    // MLX `/` promotes integer arrays to floating point. Only complete
+    // 100-frame conv chunks contribute 13 tokens; padded tail tokens are invalid.
     let inputLengthsLeave = inputLengths % 100
     let featLengths = floorDiv(inputLengthsLeave - 1, 2) + 1
     let outputLengths = (
         floorDiv(floorDiv(featLengths - 1, 2) + 1 - 1, 2)
         + 1
-        + (inputLengths / 100) * 13
+        + floorDiv(inputLengths, 100) * 13
     )
     return outputLengths
 }
@@ -884,7 +886,8 @@ public class Qwen3ASRModel: Module {
             hopLength: 160,
             nMels: config.audioConfig.numMelBins,
             melScale: .slaney,
-            hannPeriodic: true
+            hannPeriodic: true,
+            dropLastFrame: true
         )
 
         // melSpec shape: [numFrames, nMels] -> need [1, nMels, numFrames]

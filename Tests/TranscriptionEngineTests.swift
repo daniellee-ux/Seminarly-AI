@@ -230,3 +230,25 @@ final class TranscriptionEngineCacheTests: XCTestCase {
         }
     }
 }
+
+final class WhisperDecodingOptionsTests: XCTestCase {
+    @MainActor
+    func testAutomaticLanguageEnablesAcousticDetection() {
+        let options = TranscriptionEngine.whisperDecodingOptions(language: nil)
+        XCTAssertNil(options.language)
+        XCTAssertTrue(options.detectLanguage)
+        XCTAssertTrue(options.wordTimestamps)
+        XCTAssertFalse(options.usePrefillCache)
+    }
+
+    @MainActor
+    func testExplicitLanguageIsNotOverriddenByDetection() {
+        for language in ["zh", "en", "ja"] {
+            let options = TranscriptionEngine.whisperDecodingOptions(language: language)
+            XCTAssertEqual(options.language, language)
+            XCTAssertFalse(options.detectLanguage)
+            XCTAssertTrue(options.wordTimestamps)
+            XCTAssertFalse(options.usePrefillCache)
+        }
+    }
+}

@@ -13,4 +13,7 @@ utilities. There is no Python runtime or local HTTP service.
 Local changes: remove generic STT/streaming/download APIs; add cancellation in
 the decode loop; load separate quantization_config.json (decoder 4-bit, encoder
 8-bit, group size 64); preserve tied token embeddings; keep mel inputs and position additions in FP16; serialize MLX access in
-QwenASRRuntime. Update this provenance when refreshing vendored source.
+QwenASRRuntime. Match the reference frontend by trimming the final centered
+STFT frame before normalization, building Hann/mel coefficients in Float64
+before casting to Float32, and using integer floor division for valid encoder
+token lengths. Update this provenance when refreshing vendored source.

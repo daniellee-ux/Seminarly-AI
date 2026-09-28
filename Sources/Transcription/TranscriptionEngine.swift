@@ -515,6 +515,16 @@ final class TranscriptionEngine: ObservableObject {
         return segments
     }
 
+    static func whisperDecodingOptions(language: String?) -> DecodingOptions {
+        // With prompt prefill enabled, WhisperKit does not infer language merely
+        // because language is nil; it otherwise inserts its English default.
+        // The precomputed prompt cache can cause low-confidence/empty decodes
+        // with the supported Turbo artifact. Recompute those few prompt tokens;
+        // the decoder still uses its normal autoregressive KV cache.
+        DecodingOptions(language: language, usePrefillCache: false,
+                        detectLanguage: language == nil, wordTimestamps: true)
+    }
+
     private func transcribe(_ audio: [Float]) async {
         // A reset can cancel a queued task before it gets its first actor turn.
         // Do not let that old task advance the new session's audio clock.
@@ -531,7 +541,7 @@ final class TranscriptionEngine: ObservableObject {
         do {
             switch backend {
             case .whisper(let kit):
-                let options = DecodingOptions(language: selectedLanguage, wordTimestamps: true)
+                let options = Self.whisperDecodingOptions(language: selectedLanguage)
                 let results = try await kit.transcribe(audioArray: audio, decodeOptions: options)
                 try Task.checkCancellation()
                 guard generation == transcriptionGeneration else { return }

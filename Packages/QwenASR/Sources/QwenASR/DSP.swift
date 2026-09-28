@@ -18,10 +18,12 @@ import MLX
 /// the previous symmetric-only form is kept as default for compatibility.
 public func hanningWindow(size: Int, periodic: Bool = false) -> MLXArray {
     let effectiveSize = periodic ? size + 1 : size
-    let denom = Float(effectiveSize - 1)
+    // Match the reference's NumPy coefficient construction: calculate in
+    // double precision, then round each coefficient once to Float32.
+    let denom = Double(effectiveSize - 1)
     var window = [Float](repeating: 0, count: size)
     for n in 0..<size {
-        window[n] = 0.5 * (1 - cos(2 * Float.pi * Float(n) / denom))
+        window[n] = Float(0.5 * (1 - cos(2 * Double.pi * Double(n) / denom)))
     }
     return MLXArray(window)
 }
@@ -87,19 +89,23 @@ public func melFilters(
     norm: String? = "slaney",
     melScale: MelScale = .htk
 ) -> MLXArray {
-    let fMaxVal = fMax ?? Float(sampleRate) / 2.0
+    // Slaney breakpoints and normalization are generated in Float64 by the
+    // reference frontend, then stored as Float32. Early rounding can change
+    // low-confidence greedy token choices even with identical model weights.
+    let fMinValue = Double(fMin)
+    let fMaxVal = fMax.map(Double.init) ?? Double(sampleRate) / 2.0
 
     let nFreqs = nFft / 2 + 1
 
     // Generate frequency points
-    var allFreqs = [Float](repeating: 0, count: nFreqs)
+    var allFreqs = [Double](repeating: 0, count: nFreqs)
     for i in 0..<nFreqs {
-        allFreqs[i] = Float(i) * Float(sampleRate) / Float(nFft)
+        allFreqs[i] = Double(i) * Double(sampleRate) / Double(nFft)
     }
 
     // Mel scale conversion functions
-    let hzToMel: (Float) -> Float
-    let melToHz: (Float) -> Float
+    let hzToMel: (Double) -> Double
+    let melToHz: (Double) -> Double
 
     switch melScale {
     case .htk:
@@ -108,21 +114,21 @@ public func melFilters(
 
     case .slaney:
         // Slaney (Auditory Toolbox) piecewise linear/log scale
-        let fSp: Float = 200.0 / 3.0
-        let minLogHz: Float = 1000.0
-        let minLogMel = (minLogHz - fMin) / fSp
-        let logStep = log(Float(6.4)) / 27.0
+        let fSp: Double = 200.0 / 3.0
+        let minLogHz: Double = 1000.0
+        let minLogMel = (minLogHz - fMinValue) / fSp
+        let logStep = log(Double(6.4)) / 27.0
 
         hzToMel = { freq in
             if freq < minLogHz {
-                return (freq - fMin) / fSp
+                return (freq - fMinValue) / fSp
             } else {
                 return minLogMel + log(freq / minLogHz) / logStep
             }
         }
         melToHz = { mel in
             if mel < minLogMel {
-                return fMin + fSp * mel
+                return fMinValue + fSp * mel
             } else {
                 return minLogHz * exp(logStep * (mel - minLogMel))
             }
@@ -130,18 +136,18 @@ public func melFilters(
     }
 
     // Convert to mel scale and back
-    let mMin = hzToMel(fMin)
+    let mMin = hzToMel(fMinValue)
     let mMax = hzToMel(fMaxVal)
 
-    var mPts = [Float](repeating: 0, count: nMels + 2)
+    var mPts = [Double](repeating: 0, count: nMels + 2)
     for i in 0..<(nMels + 2) {
-        mPts[i] = mMin + Float(i) * (mMax - mMin) / Float(nMels + 1)
+        mPts[i] = mMin + Double(i) * (mMax - mMin) / Double(nMels + 1)
     }
 
     let fPts = mPts.map { melToHz($0) }
 
     // Compute filterbank
-    var filterbank = [[Float]](repeating: [Float](repeating: 0, count: nMels), count: nFreqs)
+    var filterbank = [[Double]](repeating: [Double](repeating: 0, count: nMels), count: nFreqs)
 
     for i in 0..<nFreqs {
         for j in 0..<nMels {
@@ -168,7 +174,7 @@ public func melFilters(
     }
 
     // Convert to MLXArray [nFreqs, nMels]
-    let flatFilters = filterbank.flatMap { $0 }
+    let flatFilters = filterbank.flatMap { $0.map(Float.init) }
     return MLXArray(flatFilters).reshaped([nFreqs, nMels])
 }
 
@@ -242,7 +248,8 @@ public func computeMelSpectrogram(
     hopLength: Int,
     nMels: Int,
     melScale: MelScale = .htk,
-    hannPeriodic: Bool = false
+    hannPeriodic: Bool = false,
+    dropLastFrame: Bool = false
 ) -> MLXArray {
     // If audio is 1D, compute proper mel spectrogram
     if audio.ndim == 1 {
@@ -253,7 +260,9 @@ public func computeMelSpectrogram(
         let freqs = stft(audio: audio, window: window, nFft: nFft, hopLength: hopLength)
 
         // Compute magnitude squared (power spectrum)
-        let magnitudes = MLX.abs(freqs).square()
+        // Preserve the reference's exponentiation operator. Depending on the
+        // MLX version, square() and pow(2) can round differently.
+        let magnitudes = MLX.abs(freqs).pow(2)
         eval(magnitudes)  // Allow MLX to free STFT complex output
 
         // Create mel filterbank [nFreqs, nMels]
@@ -265,13 +274,19 @@ public func computeMelSpectrogram(
             melScale: melScale
         )
 
-        // Apply mel filterbank: [numFrames, nFreqs] @ [nFreqs, nMels] = [numFrames, nMels]
+        // Apply mel filterbank: [numFrames, nFreqs] @ [nFreqs, nMels].
         var melSpec = MLX.matmul(magnitudes, filters)
         eval(melSpec)  // Allow MLX to free magnitudes and filters
 
         // Apply log scaling with clamping (Whisper-style normalization)
         melSpec = MLX.maximum(melSpec, MLXArray(Float(1e-10)))
         melSpec = MLX.log10(melSpec)
+        // WhisperFeatureExtractor excludes the final centered STFT frame.
+        // Trim before the global maximum so padding cannot affect normalization.
+        if dropLastFrame {
+            precondition(melSpec.dim(0) > 1, "Audio must contain at least one mel frame")
+            melSpec = melSpec[0..<(melSpec.dim(0) - 1)]
+        }
         let maxVal = melSpec.max()
         melSpec = MLX.maximum(melSpec, maxVal - MLXArray(Float(8.0)))
         melSpec = (melSpec + MLXArray(Float(4.0))) / MLXArray(Float(4.0))
